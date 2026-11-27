@@ -7,7 +7,7 @@ ENGINE = (
     "evaluation.py", "evaluator_worker.py", "evidence.py", "inference.py",
     "joint.py", "ledger.py", "measurement_plan.py", "optimize.py", "passport.py", "planner.py", "ramgpt.py",
     "registry.py", "release_info.py", "router_worker.py", "runtime.py",
-    "runtime_opt.py", "telemetry.py", "weight.py",
+    "runtime_opt.py", "telemetry.py", "weight.py", "workflow.py",
 )
 
 class BuildEngine(build_py):

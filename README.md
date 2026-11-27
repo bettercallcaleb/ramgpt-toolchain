@@ -254,3 +254,19 @@ Use a trusted base experiment specification with model, runtime, rendered templa
 Preparation does not launch the model or submit inference requests. Execution requires the registered plan ID and explicit --execute. One full session per arm is permitted by this orchestration path. The start marker is persisted before launching; interrupted or missing started runs fail closed rather than silently retrying. Complete sealed runs are archived with the existing native evaluator and repeated invocations reuse the same archived evidence. Direct run/runtime-smoke commands are blocked for measurement calibration contracts. This is an application-level workflow guard, not a security sandbox or machine-wide quota.
 
 A real archived-model preparation test froze two KV arms and 32 workload requests plus two smoke requests, with a total 20,608 completion-token cap; no GPU run was launched. The complete execution/archive/idempotency path was tested using a simulated runtime and the real pinned native evaluator. Actual backend compatibility, KV support, available GPU memory and performance remain subject to live verification. The measurement plan is private local state and does not authorize deployment.
+
+
+## Bounded optimization workflow (v0.2 development)
+
+After executing the registered measurement plan, hand its complete archived calibration to the existing joint selector:
+
+    ramgpt workflow-select PLAN_ID --policy joint-policy.json --anchor-kv f16 --budget 1024 --strategy allocated --reserve 64 --validation-seed 614 --max-requests 18 --max-completion-tokens 16512
+    ramgpt workflow-finish PLAN_ID --execute
+
+The explicit anchor and joint policy use the same fields as joint-select. The workflow requires all calibration arms to have complete sealed runs and matching archives. It previews the existing joint selector, refuses a previously failed challenger with the same configuration/context identity, and creates a holdout only for a distinct candidate with strict calibration objective improvement and a comparable calibration cohort. It never chooses a runner-up after a failed gate. Selection freezes once per measurement plan in this workflow. The lower-level experimental APIs are still available; this is not a global experiment quota or a security boundary.
+
+The holdout budget is separate from the calibration budget and includes both smoke requests. The registered decision, actual native holdout schedules, immutable contract identities, run bindings and cost are rechecked before execution. Each arm gets at most one complete session on this path, with a persistent start marker. Interrupted or missing started runs fail closed. Complete archived holdouts can be reused without new requests. No eligible candidate or no strict improvement produces no new holdout requests.
+
+The final workflow report records the independent pilot outcome and creates a portable Model Passport in the original measurement directory. Failed validation remains visible; a repeated finish returns the same final artifact with zero new requests. Historical raw evidence and local workflow state must remain private. A successful pilot does not authorize deployment.
+
+Integration tests use a simulated runtime with deterministic memory telemetry, real sealed inference/evidence paths and the pinned native evaluator. They cover successful and failed validation, no-candidate completion, repeated finish, budget rejection, and interruption protection. Real end-to-end GPU verification of this new workflow remains a separate step.

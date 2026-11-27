@@ -43,6 +43,8 @@ def main():
     z=sub.add_parser('optimize');z.add_argument('model');z.add_argument('--vram',required=True);z.add_argument('--objective',choices=['balanced','memory','latency','tokens'],default='balanced');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--min-tasks',type=int,default=8);z.add_argument('--headroom',default='1GiB');z.add_argument('--context',type=int);z.add_argument('--max-sample-gap',type=float,default=.25);z.add_argument('--fidelity-report');z.add_argument('--max-kl',type=float);z.add_argument('--out')
     z=sub.add_parser('measurement-prepare');z.add_argument('--spec',required=True);z.add_argument('--out',required=True);z.add_argument('--seed',type=int,required=True);z.add_argument('--variants',type=int,default=1);z.add_argument('--budgets',type=int,nargs='+',required=True);z.add_argument('--strategies',nargs='+',default=['allocated']);z.add_argument('--reserve',type=int,default=64);z.add_argument('--kv',nargs='+',default=['f16','q8_0']);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True)
     z=sub.add_parser('measurement-run');z.add_argument('plan_id');z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('workflow-select');z.add_argument('plan_id');z.add_argument('--policy',required=True);z.add_argument('--anchor-kv',required=True);z.add_argument('--budget',type=int,required=True);z.add_argument('--strategy',required=True);z.add_argument('--reserve',type=int,required=True);z.add_argument('--validation-seed',type=int,required=True);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True)
+    z=sub.add_parser('workflow-finish');z.add_argument('plan_id');z.add_argument('--execute',action='store_true')
     args=p.parse_args()
     reg=None
     try:
@@ -82,11 +84,17 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
-                if args.action=='measurement-prepare':
+                if args.action=='workflow-select':
+                    import workflow
+                    result=workflow.select(reg,store,args.plan_id,read_json(args.policy),args.anchor_kv,[args.budget,args.strategy,args.reserve],args.validation_seed,args.max_requests,args.max_completion_tokens)
+                elif args.action=='workflow-finish':
+                    import workflow
+                    result=workflow.finish(reg,store,args.plan_id,args.execute)
+                elif args.action=='measurement-prepare':
                     import measurement_plan
                     result=measurement_plan.prepare(reg,store,args.spec,args.out,args.seed,args.variants,args.budgets,args.strategies,args.reserve,args.kv,args.max_requests,args.max_completion_tokens)
                 elif args.action=='measurement-run':

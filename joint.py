@@ -172,7 +172,7 @@ def decision(store,did):
     if select(store,d['evaluation_ids'],d['anchor_eid'],d['anchor_fixed'],d['policy'])!=d['result']:raise ValueError('Joint decision replay mismatch')
     return d
 
-def prepare(reg,store,did,out):
+def prepare(reg,store,did,out,bounded_workflow=False):
     init(store);d=decision(store,did)
     chosen=d['result']['selected'];base=d['result']['baseline']
     if chosen is None or chosen['candidate_id']==base['candidate_id']:raise ValueError('No distinct frozen challenger')
@@ -197,6 +197,7 @@ def prepare(reg,store,did,out):
         schedule=out/(name+'-schedule.json')
         evaluation.prepare(dataset,archive,[budget],[strategy],reserve,schedule)
         work={**cal['workload'],'seed':d['validation_seed'],'budgets':[budget],'strategies':[strategy],'reserve':reserve,'request_count':len(manifest['tasks']),'task_count':len(manifest['tasks']),'joint_decision_id':did,'joint_arm':name}
+        if bounded_workflow:work['bounded_workflow']=True
         spec={'inputs':[{'role':x['role'],'path':str(dataset if x['role']=='dataset' else schedule if x['role']=='configuration' else x['path'])} for x in cal['inputs']],'execution':cal['execution'],'workload':work}
         plan=reg.freeze(spec)
         import inference
