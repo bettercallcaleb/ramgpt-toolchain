@@ -49,6 +49,10 @@ def main():
     z=sub.add_parser('healer-import');z.add_argument('manifest');z.add_argument('--native',required=True);z.add_argument('--gguf-root',required=True);z.add_argument('--max-growth',type=float,required=True)
     z=sub.add_parser('ladder-import');z.add_argument('model');z.add_argument('raw');z.add_argument('--native',required=True);z.add_argument('--seed',type=int,required=True);z.add_argument('--variants',type=int,required=True)
     z=sub.add_parser('tool-find');z.add_argument('--artifact')
+    z=sub.add_parser('exl3-preflight');z.add_argument('repo');z.add_argument('--native',required=True);z.add_argument('--backend',required=True);z.add_argument('--bits',type=float,default=4.0)
+    z=sub.add_parser('exl3-import');z.add_argument('folder');z.add_argument('manifest');z.add_argument('--native',required=True)
+    z=sub.add_parser('heretic-import');z.add_argument('--native',required=True);z.add_argument('--dataset',required=True);z.add_argument('--base',required=True);z.add_argument('--variant',required=True);z.add_argument('--track',choices=['retention','epistemic'],required=True)
+    z=sub.add_parser('tool-reports');z.add_argument('--tool',choices=['exl3-first-mover','hereticbench'])
     args=p.parse_args()
     reg=None
     try:
@@ -88,11 +92,23 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
-                if args.action=='healer-compose':
+                if args.action=='exl3-preflight':
+                    import native_bridge
+                    result=native_bridge.exl3_preflight(store,args.repo,args.native,args.backend,args.bits)
+                elif args.action=='exl3-import':
+                    import native_bridge
+                    result=native_bridge.exl3_import(store,args.folder,args.manifest,args.native)
+                elif args.action=='heretic-import':
+                    import native_bridge
+                    result=native_bridge.heretic_import(store,args.native,args.dataset,args.base,args.variant,args.track)
+                elif args.action=='tool-reports':
+                    import native_bridge
+                    result=native_bridge.find(store,args.tool)
+                elif args.action=='healer-compose':
                     import native_tools
                     result=native_tools.healer_compose(reg,store,args.base,args.donor,args.out,args.native,args.gguf_root,args.tensor,args.max_growth,args.execute)
                 elif args.action=='healer-import':

@@ -286,3 +286,19 @@ Use trusted producer code and compatible NumPy/GGUF dependencies. Compose create
 Ladder import copies raw responses and their manifest to a temporary directory, runs the native score command and requires exact complete-report parity. Original files remain untouched. It requires the declared model path and size to match the supplied model, and records its current SHA-256; this does not independently authenticate historical runtime or weight identity. The two receipts are indexed together by artifact hash and can be retrieved via tool-find. They remain separate from managed benchmark results and from the existing passport schema. IFEval, EXL3 conversion and HereticBench adapters are not yet connected here.
 
 Local integration checks: a synthetic two-tensor GGUF composed by the actual native Healer passed payload re-verification; an existing 27B repaired artifact passed all 866 tensor checks with 32 donor tensors and 4.98% file growth. The native knowledge report replay matched all 60 historical items for that same artifact. No new model inference was launched.
+
+
+## Native EXL3 First Mover and HereticBench integration
+
+    ramgpt exl3-preflight Qwen/Qwen3-8B --native /path/to/exl3-first-mover/fm.py --backend /path/to/exllamav3 --bits 4
+    ramgpt exl3-import /path/to/exl3-artifact /path/to/manifest-4.00bpw.json --native /path/to/exl3-first-mover/fm.py
+    ramgpt heretic-import --native /path/to/HereticBench --dataset retention_signal.jsonl --base base.jsonl --variant variant.jsonl --track retention
+    ramgpt heretic-import --native /path/to/HereticBench --dataset epistemic_integrity.jsonl --base base-epi.jsonl --variant variant-epi.jsonl --track epistemic
+    ramgpt tool-reports --tool exl3-first-mover
+    ramgpt tool-reports --tool hereticbench
+
+First Mover preflight calls the native metadata/config workflow in an isolated temporary workspace, with the explicitly selected local backend architecture directory. It uses public repository metadata, performs no weight download or conversion, and requires the native size/disk gate and architecture inspection to pass before reporting readiness. Use a clean trusted fm.py without local config overrides. Readiness is not a GPU or runtime guarantee. The native EXL3 manifest adapter computes a format-specific directory identity from the complete producer file manifest (excluding README.md, as the producer does), requires EXL3 config metadata, and detects changed files. It does not validate tensor semantics or certify a historical conversion. Actual native conversion and runtime execution remain outside the integrated CLI.
+
+HereticBench imports complete paired historical retention/instruction or epistemic runs. It verifies dataset hashes, matching messages and grading rules, unique complete task IDs, and native semantic/format score parity. Each category and track is retained separately, without a cross-axis score. It records dataset and raw-run hashes rather than inventing model artifact hashes for historical runs without authenticated model identities. The aggregate within a dataset is descriptive, not a cross-benchmark optimization target. OpenBehavior and boundary evaluation are not integrated. Native reports are distinct from file-identified tool receipts and are available via tool-reports; they are not yet embedded in the Model Passport.
+
+Local checks: Qwen3-8B metadata preflight returned GREEN with 4 bpw target, 38.65 GiB estimated disk requirement and positive native architecture inspection. Native First Mover manifest creation and import were checked on a synthetic directory fixture, including tamper rejection. The published HereticBench reference retention and epistemic raw files matched their published SHA-256 values; all 480 native semantic/format grade pairs replayed exactly. No new weight conversion or inference was performed.

@@ -1,4 +1,5 @@
 import json
+import hashlib
 import math
 import subprocess
 import sys
@@ -16,7 +17,7 @@ def tree(root):
     root=Path(root).resolve(strict=True)
     files=sorted(p for p in root.rglob('*') if p.is_file() and p.suffix in ('.py','.json') and '__pycache__' not in p.parts)
     if not files:raise ValueError('Empty native source tree')
-    return digest([(str(p.relative_to(root)),ref(p)['sha256']) for p in files])
+    return digest([(str(p.relative_to(root)),(hashlib.sha256(b'').hexdigest() if p.stat().st_size==0 else ref(p)['sha256'])) for p in files])
 
 def worker(code,argv,timeout=180):
     p=subprocess.run([sys.executable,'-I','-c',code,*map(str,argv)],capture_output=True,text=True,timeout=timeout)
