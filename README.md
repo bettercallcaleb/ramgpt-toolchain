@@ -270,3 +270,19 @@ The holdout budget is separate from the calibration budget and includes both smo
 The final workflow report records the independent pilot outcome and creates a portable Model Passport in the original measurement directory. Failed validation remains visible; a repeated finish returns the same final artifact with zero new requests. Historical raw evidence and local workflow state must remain private. A successful pilot does not authorize deployment.
 
 Integration tests use a simulated runtime with deterministic memory telemetry, real sealed inference/evidence paths and the pinned native evaluator. They cover successful and failed validation, no-candidate completion, repeated finish, budget rejection, and interruption protection. Real end-to-end GPU verification of this new workflow remains a separate step.
+
+
+## Native tool integration: GGUF-Healer and ConceptLadder
+
+The toolchain can now call the existing GGUF-Healer tensor composer, register an existing repaired artifact after checking every output tensor against its source, and replay historical ConceptLadder v0.5 knowledge scoring without inference. No producer code is bundled.
+
+    ramgpt healer-compose base.gguf donor.gguf --out repaired.gguf --native /path/to/healer.py --gguf-root /path/to/llama.cpp/gguf-py --tensor output.weight --max-growth 0.05 --execute
+    ramgpt healer-import repaired.manifest.json --native /path/to/healer.py --gguf-root /path/to/llama.cpp/gguf-py --max-growth 0.05
+    ramgpt ladder-import repaired.gguf knowledge.jsonl --native /path/to/conceptladder --seed 211 --variants 1
+    ramgpt tool-find --artifact ARTIFACT_SHA256
+
+Use trusted producer code and compatible NumPy/GGUF dependencies. Compose creates a new file only and requires explicit execution. The native compatibility checks and size cap are not relaxed; the caller must establish shared checkpoint lineage. Import verifies all selected and untouched tensor payloads, descriptors, metadata, file size and current input/output hashes. If verification fails after composition, the output is retained for inspection, not registered as successful. A byte-verified repair is not proof of quality improvement.
+
+Ladder import copies raw responses and their manifest to a temporary directory, runs the native score command and requires exact complete-report parity. Original files remain untouched. It requires the declared model path and size to match the supplied model, and records its current SHA-256; this does not independently authenticate historical runtime or weight identity. The two receipts are indexed together by artifact hash and can be retrieved via tool-find. They remain separate from managed benchmark results and from the existing passport schema. IFEval, EXL3 conversion and HereticBench adapters are not yet connected here.
+
+Local integration checks: a synthetic two-tensor GGUF composed by the actual native Healer passed payload re-verification; an existing 27B repaired artifact passed all 866 tensor checks with 32 donor tensors and 4.98% file growth. The native knowledge report replay matched all 60 historical items for that same artifact. No new model inference was launched.

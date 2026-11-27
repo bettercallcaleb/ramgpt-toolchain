@@ -45,6 +45,10 @@ def main():
     z=sub.add_parser('measurement-run');z.add_argument('plan_id');z.add_argument('--execute',action='store_true')
     z=sub.add_parser('workflow-select');z.add_argument('plan_id');z.add_argument('--policy',required=True);z.add_argument('--anchor-kv',required=True);z.add_argument('--budget',type=int,required=True);z.add_argument('--strategy',required=True);z.add_argument('--reserve',type=int,required=True);z.add_argument('--validation-seed',type=int,required=True);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True)
     z=sub.add_parser('workflow-finish');z.add_argument('plan_id');z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('healer-compose');z.add_argument('base');z.add_argument('donor');z.add_argument('--out',required=True);z.add_argument('--native',required=True);z.add_argument('--gguf-root',required=True);z.add_argument('--tensor',action='append',required=True);z.add_argument('--max-growth',type=float,required=True);z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('healer-import');z.add_argument('manifest');z.add_argument('--native',required=True);z.add_argument('--gguf-root',required=True);z.add_argument('--max-growth',type=float,required=True)
+    z=sub.add_parser('ladder-import');z.add_argument('model');z.add_argument('raw');z.add_argument('--native',required=True);z.add_argument('--seed',type=int,required=True);z.add_argument('--variants',type=int,required=True)
+    z=sub.add_parser('tool-find');z.add_argument('--artifact')
     args=p.parse_args()
     reg=None
     try:
@@ -84,11 +88,23 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
-                if args.action=='workflow-select':
+                if args.action=='healer-compose':
+                    import native_tools
+                    result=native_tools.healer_compose(reg,store,args.base,args.donor,args.out,args.native,args.gguf_root,args.tensor,args.max_growth,args.execute)
+                elif args.action=='healer-import':
+                    import native_tools
+                    result=native_tools.healer_import(reg,store,args.manifest,args.native,args.gguf_root,args.max_growth)
+                elif args.action=='ladder-import':
+                    import native_tools
+                    result=native_tools.ladder_import(reg,store,args.model,args.raw,args.native,args.seed,args.variants)
+                elif args.action=='tool-find':
+                    import native_tools
+                    result=native_tools.find(store,args.artifact)
+                elif args.action=='workflow-select':
                     import workflow
                     result=workflow.select(reg,store,args.plan_id,read_json(args.policy),args.anchor_kv,[args.budget,args.strategy,args.reserve],args.validation_seed,args.max_requests,args.max_completion_tokens)
                 elif args.action=='workflow-finish':
