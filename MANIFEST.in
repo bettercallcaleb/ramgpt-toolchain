@@ -1,0 +1,7 @@
+include README.md ROADMAP.md SECURITY.md LICENSE NOTICE pyproject.toml setup.py
+include adaptive.py audit_parity.py autotune_worker.py doctor.py evaluation.py evaluator_worker.py evidence.py inference.py joint.py ledger.py optimize.py passport.py ramgpt.py registry.py release_info.py router_worker.py runtime.py runtime_opt.py telemetry.py weight.py
+prune state
+prune fixtures
+prune build
+prune dist
+global-exclude *.sqlite *.gguf *.pyz *.npz *.pyc

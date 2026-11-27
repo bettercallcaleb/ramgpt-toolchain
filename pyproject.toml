@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ramgpt-toolchain"
+version = "0.1.0"
+description = "Local evidence-first GGUF evaluation and optimization toolchain"
+readme = "README.md"
+license = {file = "LICENSE"}
+
+requires-python = ">=3.12"
+dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Repository = "https://github.com/bettercallcaleb/ramgpt-toolchain"
+Issues = "https://github.com/bettercallcaleb/ramgpt-toolchain/issues"
+
+[project.optional-dependencies]
+fidelity = ["numpy>=1.26"]
+gpu = ["nvidia-ml-py>=12"]
+all = ["numpy>=1.26", "nvidia-ml-py>=12"]
+
+[project.scripts]
+ramgpt = "ramgpt_toolchain.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["ramgpt_toolchain"]
+include-package-data = false

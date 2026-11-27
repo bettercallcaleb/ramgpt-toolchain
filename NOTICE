@@ -1,0 +1,7 @@
+RAMGPT Toolchain
+Copyright 2026 RAMGPT Toolchain contributors
+
+This project provides adapters for separately distributed tools.
+BudgetFit and TrustMeBro, Q4Fit, QuantBench and llama-autotune remain
+separate projects; their native code, models and data are not bundled.
+Third-party tools and dependencies retain their own licenses.
