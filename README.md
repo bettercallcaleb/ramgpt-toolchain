@@ -155,15 +155,21 @@ ramgpt tune MODEL_SHA256 --vram 24GiB --execute
 
 Model-add copies a local single-file GGUF into state/models/SHA256/model.gguf, verifies the bytes and registers the artifact. Repeated imports reuse the verified file. Tune also accepts ordinary paths; caching is optional. Use --cache to choose another cache root.
 
-To acquire a public Hugging Face GGUF, provide the immutable repository commit, exact filename, expected LFS SHA-256 and byte count from the model repository:
+For public Hugging Face repositories, list eligible single-file GGUF artifacts and choose the exact filename. RAMGPT can resolve the immutable repository commit, file SHA-256 and size automatically:
 
 ```bash
-ramgpt model-fetch ggml-org/tiny-llamas stories260K.gguf \
-  --revision 99dd1a73db5a37100bd4ae633f4cfce6560e1567 \
-  --sha256 047bf46455a544931cff6fef14d7910154c56afbc23ab1c5e56a72e69912c04b \
-  --bytes 1185376 --execute
+ramgpt model-list Qwen/Qwen3-0.6B-GGUF
+ramgpt model-fetch Qwen/Qwen3-0.6B-GGUF Qwen3-0.6B-Q8_0.gguf --lock-out model.lock.json
+ramgpt model-fetch --lock model.lock.json --execute
+ramgpt tune model.lock.json --vram 24GiB --execute
 ```
 
-This tiny public file is a download/cache demonstration, not a recommended chat model. Downloads are bounded by the explicit byte count, checked against SHA-256 and the supported GGUF header, and published into the cache only after verification. No authentication tokens, automatic moving-branch resolution, multi-shard GGUF or EXL3 download support is included. A cache hit verifies content, not historical repository ownership. The model-fetch result records the requested source; model identity is the verified file hash.
+The first fetch command reads metadata and saves a lock without downloading weights. The second uses that exact immutable revision, with no metadata refresh. Tune resolves the lock to the verified local cache; it does not download missing models. Alternatively, add --execute to the first fetch command to resolve and download in a single invocation. This resolves the requested ref afresh, so keep and reuse the lock when reproducibility matters.
+
+Automatic metadata resolution defaults to an 8 GiB download cap. Use --max-size, for example 20GiB, to approve a larger model. Explicit SHA-256/size mode and saved-lock mode remain supported, bounded by the exact declared size and the 128 GiB implementation limit; --max-size can impose a lower cap in those modes too. Downloads are streamed, checked against the expected size, SHA-256 and supported GGUF header, and published only after verification. Repeated locked fetches verify the existing cache without network requests.
+
+The source lock preserves the repository, immutable commit and expected artifact identity; it is not a signed publisher attestation. Metadata mode trusts public Hugging Face metadata, not an independently obtained checksum. No private/gated repositories, authentication tokens, nested or multi-shard GGUF filenames or EXL3 downloads are supported. A cache hit verifies file content, not historical repository ownership.
+
+The metadata resolver was exercised on the public Qwen3-0.6B GGUF catalog (preview only). The full lock/download/reuse workflow was verified with the 1.19 MB ggml-org/tiny-llamas test artifact, which is not a recommended chat model.
 
 Actual integration check: tune automatically captured the template and executed 16 workload requests plus two transport checks for the existing Qwen3-0.6B GGUF, with no eligible configuration at the fixed accuracy floor; no holdout was executed. Both local 429 MB import and a real 1.19 MB public Hugging Face download were verified, and repeat imports transferred zero new bytes. The GPU returned to baseline. Positive holdout behavior remains covered by the existing synthetic-runtime tests, not a new real positive-control result.
