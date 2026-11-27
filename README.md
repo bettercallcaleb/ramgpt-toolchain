@@ -302,3 +302,20 @@ First Mover preflight calls the native metadata/config workflow in an isolated t
 HereticBench imports complete paired historical retention/instruction or epistemic runs. It verifies dataset hashes, matching messages and grading rules, unique complete task IDs, and native semantic/format score parity. Each category and track is retained separately, without a cross-axis score. It records dataset and raw-run hashes rather than inventing model artifact hashes for historical runs without authenticated model identities. The aggregate within a dataset is descriptive, not a cross-benchmark optimization target. OpenBehavior and boundary evaluation are not integrated. Native reports are distinct from file-identified tool receipts and are available via tool-reports; they are not yet embedded in the Model Passport.
 
 Local checks: Qwen3-8B metadata preflight returned GREEN with 4 bpw target, 38.65 GiB estimated disk requirement and positive native architecture inspection. Native First Mover manifest creation and import were checked on a synthetic directory fixture, including tamper rejection. The published HereticBench reference retention and epistemic raw files matched their published SHA-256 values; all 480 native semantic/format grade pairs replayed exactly. No new weight conversion or inference was performed.
+
+
+## One workspace for the native tools
+
+Copy tools.example.json to a private local tools.json and set the paths to your trusted native checkouts. You can configure just the tools you use. Relative paths are resolved against the configuration file directory. Explicit command arguments override configured paths.
+
+    ramgpt --tools-config tools.json tools
+    ramgpt --tools-config tools.json build original-f16.gguf --out output/model.gguf --default Q4_K --execute
+    ramgpt model-info
+    ramgpt model-info ARTIFACT_SHA256
+    ramgpt model-info exl3:ARTIFACT_ID
+
+The catalog checks path presence, not compatibility. Keep the same --db and --evidence-db for related operations. Model-info lists known models or shows their producer receipts, managed evaluations, weight evidence, actual recipe/repair derivatives and separate comparison relationships. Unauthenticated historical paired reports are not attached to model hashes. EXL3 identity is explicitly namespaced.
+
+Build delegates to native Q4Fit with llama-quantize, using a floating-point single-file GGUF input. It requires --execute and a fresh output directory, supports native --set REGEX=TYPE overrides, optional --imatrix and --threads, and verifies the native output recipe before registering the model. If a build fails, keep its files for inspection; no automatic overwrite, upload, quality claim or inference. Native dependencies are not bundled. The direct production adapter was exercised on Qwen3-0.6B F16: the native CPU quantizer completed in 7.33 seconds and reproduced the previous Q4_K file SHA-256 exactly.
+
+Existing lower-level commands continue to work. The config supplies native paths to build, healer-compose, healer-import, ladder-import, exl3-preflight, exl3-import, heretic-import, weight-import, runtime-prepare, prepare and router-parity. The standalone TrustMeBro catalog entry uses the existing BudgetFit-integrated evaluator, not a new independent executable.

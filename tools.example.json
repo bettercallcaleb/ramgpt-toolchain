@@ -1,0 +1,23 @@
+{
+  "tools": {
+    "q4fit": {
+      "native": "/path/to/q4fit/q4fit.py",
+      "quantizer": "/path/to/llama.cpp/build/bin/llama-quantize",
+      "gguf_root": "/path/to/llama.cpp/gguf-py"
+    },
+    "quantbench": {"native": "/path/to/quantbench/run-artifact-comparison.py"},
+    "conceptladder": {"native": "/path/to/conceptladder-checkout"},
+    "trustmebro": {"evaluator": "/path/to/budgetfit.pyz"},
+    "budgetfit": {"evaluator": "/path/to/budgetfit.pyz"},
+    "llama-autotune": {"autotune_source": "/path/to/llama-autotune"},
+    "gguf-healer": {
+      "native": "/path/to/gguf-healer/healer.py",
+      "gguf_root": "/path/to/llama.cpp/gguf-py"
+    },
+    "exl3-first-mover": {
+      "native": "/path/to/exl3-first-mover/fm.py",
+      "backend": "/path/to/exllamav3"
+    },
+    "hereticbench": {"native": "/path/to/HereticBench"}
+  }
+}

@@ -10,6 +10,7 @@ def main():
     p.add_argument('--version',action='version',version=VERSION)
     p.add_argument('--db',default='state/registry.sqlite')
     p.add_argument('--evidence-db',default='state/evidence.sqlite')
+    p.add_argument('--tools-config')
     sub=p.add_subparsers(dest='action',required=True)
     r=sub.add_parser('register');r.add_argument('path');r.add_argument('--role',default='model')
     a=sub.add_parser('artifact');a.add_argument('sha256')
@@ -19,7 +20,7 @@ def main():
     m=sub.add_parser('runtime-smoke');m.add_argument('id');m.add_argument('--out',required=True)
     n=sub.add_parser('run');n.add_argument('id');n.add_argument('--out',required=True);n.add_argument('--max-new',type=int)
     e=sub.add_parser('score');e.add_argument('id');e.add_argument('--run',required=True);e.add_argument('--out',required=True)
-    q=sub.add_parser('prepare');q.add_argument('--dataset',required=True);q.add_argument('--evaluator',required=True);q.add_argument('--budgets',type=int,nargs='+',required=True);q.add_argument('--strategies',nargs='+',required=True);q.add_argument('--reserve',type=int);q.add_argument('--out',required=True)
+    q=sub.add_parser('prepare');q.add_argument('--dataset',required=True);q.add_argument('--evaluator');q.add_argument('--budgets',type=int,nargs='+',required=True);q.add_argument('--strategies',nargs='+',required=True);q.add_argument('--reserve',type=int);q.add_argument('--out',required=True)
     z=sub.add_parser('archive-run');z.add_argument('id');z.add_argument('--run',required=True);z.add_argument('--report')
     z=sub.add_parser('evidence-find');z.add_argument('--artifact');z.add_argument('--contract')
     z=sub.add_parser('evidence-get');z.add_argument('id');z.add_argument('--out',required=True)
@@ -27,8 +28,8 @@ def main():
     z=sub.add_parser('select');z.add_argument('evaluation_id');z.add_argument('--policy',required=True);z.add_argument('--validation-seed',type=int)
     z=sub.add_parser('validate-selection');z.add_argument('decision_id');z.add_argument('evaluation_id')
     z=sub.add_parser('router-prepare');z.add_argument('evaluation_id');z.add_argument('--validation-seed',required=True,type=int);z.add_argument('--thresholds',required=True);z.add_argument('--out',required=True)
-    z=sub.add_parser('router-parity');z.add_argument('--evaluator',required=True);z.add_argument('--folder',required=True)
-    z=sub.add_parser('runtime-prepare');z.add_argument('--spec',required=True);z.add_argument('--autotune-source',required=True);z.add_argument('--out',required=True);z.add_argument('--seed',type=int,default=611)
+    z=sub.add_parser('router-parity');z.add_argument('--evaluator');z.add_argument('--folder',required=True)
+    z=sub.add_parser('runtime-prepare');z.add_argument('--spec',required=True);z.add_argument('--autotune-source');z.add_argument('--out',required=True);z.add_argument('--seed',type=int,default=611)
     z=sub.add_parser('runtime-compare');z.add_argument('--plan',required=True);z.add_argument('evaluation_ids',nargs=2)
     z=sub.add_parser('weight-import');z.add_argument('kind',choices=['quantbench','q4fit','recipe']);z.add_argument('path');z.add_argument('--native')
     z=sub.add_parser('weight-find');z.add_argument('--artifact');z.add_argument('--reference')
@@ -45,17 +46,26 @@ def main():
     z=sub.add_parser('measurement-run');z.add_argument('plan_id');z.add_argument('--execute',action='store_true')
     z=sub.add_parser('workflow-select');z.add_argument('plan_id');z.add_argument('--policy',required=True);z.add_argument('--anchor-kv',required=True);z.add_argument('--budget',type=int,required=True);z.add_argument('--strategy',required=True);z.add_argument('--reserve',type=int,required=True);z.add_argument('--validation-seed',type=int,required=True);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True)
     z=sub.add_parser('workflow-finish');z.add_argument('plan_id');z.add_argument('--execute',action='store_true')
-    z=sub.add_parser('healer-compose');z.add_argument('base');z.add_argument('donor');z.add_argument('--out',required=True);z.add_argument('--native',required=True);z.add_argument('--gguf-root',required=True);z.add_argument('--tensor',action='append',required=True);z.add_argument('--max-growth',type=float,required=True);z.add_argument('--execute',action='store_true')
-    z=sub.add_parser('healer-import');z.add_argument('manifest');z.add_argument('--native',required=True);z.add_argument('--gguf-root',required=True);z.add_argument('--max-growth',type=float,required=True)
-    z=sub.add_parser('ladder-import');z.add_argument('model');z.add_argument('raw');z.add_argument('--native',required=True);z.add_argument('--seed',type=int,required=True);z.add_argument('--variants',type=int,required=True)
+    z=sub.add_parser('healer-compose');z.add_argument('base');z.add_argument('donor');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--tensor',action='append',required=True);z.add_argument('--max-growth',type=float,required=True);z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('healer-import');z.add_argument('manifest');z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--max-growth',type=float,required=True)
+    z=sub.add_parser('ladder-import');z.add_argument('model');z.add_argument('raw');z.add_argument('--native');z.add_argument('--seed',type=int,required=True);z.add_argument('--variants',type=int,required=True)
     z=sub.add_parser('tool-find');z.add_argument('--artifact')
-    z=sub.add_parser('exl3-preflight');z.add_argument('repo');z.add_argument('--native',required=True);z.add_argument('--backend',required=True);z.add_argument('--bits',type=float,default=4.0)
-    z=sub.add_parser('exl3-import');z.add_argument('folder');z.add_argument('manifest');z.add_argument('--native',required=True)
-    z=sub.add_parser('heretic-import');z.add_argument('--native',required=True);z.add_argument('--dataset',required=True);z.add_argument('--base',required=True);z.add_argument('--variant',required=True);z.add_argument('--track',choices=['retention','epistemic'],required=True)
+    z=sub.add_parser('exl3-preflight');z.add_argument('repo');z.add_argument('--native');z.add_argument('--backend');z.add_argument('--bits',type=float,default=4.0)
+    z=sub.add_parser('exl3-import');z.add_argument('folder');z.add_argument('manifest');z.add_argument('--native')
+    z=sub.add_parser('heretic-import');z.add_argument('--native');z.add_argument('--dataset',required=True);z.add_argument('--base',required=True);z.add_argument('--variant',required=True);z.add_argument('--track',choices=['retention','epistemic'],required=True)
     z=sub.add_parser('tool-reports');z.add_argument('--tool',choices=['exl3-first-mover','hereticbench'])
+    z=sub.add_parser('tools')
+    z=sub.add_parser('model-info');z.add_argument('subject',nargs='?')
+    z=sub.add_parser('build');z.add_argument('model');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--quantizer');z.add_argument('--default',default='Q4_K');z.add_argument('--set',action='append',default=[]);z.add_argument('--threads',type=int,default=12);z.add_argument('--imatrix');z.add_argument('--execute',action='store_true')
     args=p.parse_args()
     reg=None
     try:
+        import workspace
+        cfg=workspace.load(args.tools_config)
+        workspace.apply(args,cfg)
+        if args.action=='tools':
+            print(json.dumps(workspace.catalog(cfg),indent=2,ensure_ascii=False,allow_nan=False))
+            return 0
         if args.action=='doctor':
             import doctor
             result=doctor.check(args.evaluator,args.runtime,args.model,args.gpu)
@@ -92,11 +102,16 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('build','model-info','exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
-                if args.action=='exl3-preflight':
+                if args.action=='build':
+                    import native_tools
+                    result=native_tools.q4fit_build(reg,store,args.model,args.out,args.native,args.gguf_root,args.quantizer,args.default,args.set,args.threads,args.imatrix,args.execute)
+                elif args.action=='model-info':
+                    result=workspace.model_info(reg,store,args.subject) if args.subject else workspace.models(reg,store)
+                elif args.action=='exl3-preflight':
                     import native_bridge
                     result=native_bridge.exl3_preflight(store,args.repo,args.native,args.backend,args.bits)
                 elif args.action=='exl3-import':

@@ -1,5 +1,5 @@
-include README.md ROADMAP.md SECURITY.md LICENSE NOTICE pyproject.toml setup.py
-include adaptive.py audit_parity.py autotune_worker.py doctor.py evaluation.py evaluator_worker.py evidence.py inference.py joint.py ledger.py measurement_plan.py native_tools.py native_bridge.py optimize.py passport.py planner.py ramgpt.py registry.py release_info.py router_worker.py runtime.py runtime_opt.py telemetry.py weight.py workflow.py
+include tools.example.json README.md ROADMAP.md SECURITY.md LICENSE NOTICE pyproject.toml setup.py
+include adaptive.py audit_parity.py autotune_worker.py doctor.py evaluation.py evaluator_worker.py evidence.py inference.py joint.py ledger.py measurement_plan.py native_tools.py native_bridge.py optimize.py passport.py planner.py ramgpt.py registry.py release_info.py router_worker.py runtime.py runtime_opt.py telemetry.py weight.py workflow.py workspace.py
 prune state
 prune fixtures
 prune build

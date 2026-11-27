@@ -140,3 +140,42 @@ def healer_compose(reg,store,base,donor,out,native,gguf_root,tensors,max_growth,
     receipt=healer_import(reg,store,manifest,native,gguf_root,max_growth)
     if [receipt['inputs'][k]['sha256'] for k in ('base','donor')]!=[r['sha256'] for r in before] or receipt['native_sha256']!=script['sha256'] or receipt['gguf_source_sha256']!=library:raise ValueError('Composition receipt mismatch')
     return receipt
+
+Q4FIT_BUILD="""
+import contextlib,io,json,runpy,sys
+from pathlib import Path
+native,gguf,model,out,quantizer,default,threads,imatrix,*changes=sys.argv[1:]
+sys.path.insert(0,gguf)
+sys.path.insert(0,str(Path(native).parent))
+h=runpy.run_path(native)
+with contextlib.redirect_stdout(sys.stderr):
+ ts=h['inventory'](model)
+ if not any(t['eligible'] for t in ts) or any(t['source'] not in ('F32','F16','BF16') for t in ts):raise ValueError('Build requires a floating-point GGUF source, not a requantization')
+ h['build'](model,out,quantizer,default,changes,imatrix or None,int(threads),False)
+print(json.dumps(json.loads(Path(out).with_suffix('.manifest.json').read_text())))
+"""
+
+def q4fit_build(reg,store,model,out,native,gguf_root,quantizer,default,changes,threads,imatrix=None,execute=False):
+    import os
+    import weight
+    if execute is not True:raise ValueError('Explicit --execute required for weight construction')
+    if default not in ('Q3_K','Q4_K','Q5_K','Q6_K','Q8_0','F16','BF16'):raise ValueError('Unsupported native precision')
+    if type(threads) is not int or not 1<=threads<=128:raise ValueError('Invalid thread count')
+    model=Path(model).resolve(strict=True);native=Path(native).resolve(strict=True);gguf_root=Path(gguf_root).resolve(strict=True);quantizer=Path(quantizer).resolve(strict=True);out=Path(out).resolve()
+    if native.name!='q4fit.py' or quantizer.name!='llama-quantize' or not os.access(quantizer,os.X_OK):raise ValueError('Expected native q4fit.py and executable llama-quantize')
+    if out.suffix.lower()!='.gguf' or out==model:raise ValueError('Expected distinct GGUF output')
+    if out.parent.exists():raise ValueError('Use a new output directory to protect recipe and log files')
+    source=fingerprint(model,'model');script=ref(native);lib=tree(gguf_root/'gguf');binary=ref(quantizer,'runtime')
+    matrix=Path(imatrix).resolve(strict=True) if imatrix else None
+    matrix_ref=ref(matrix) if matrix else None
+    out.parent.mkdir(parents=True,exist_ok=False)
+    manifest=worker(Q4FIT_BUILD,[native,gguf_root,model,out,quantizer,default,threads,matrix or '',*changes],1800)
+    path=out.with_suffix('.manifest.json')
+    if manifest!=read_json(path) or manifest['source_sha256']!=source['sha256'] or manifest['default']!=default:raise ValueError('Native build manifest mismatch')
+    if source!=fingerprint(model,'model') or script!=ref(native) or lib!=tree(gguf_root/'gguf') or binary!=ref(quantizer,'runtime') or (matrix is not None and matrix_ref!=ref(matrix)):raise ValueError('Build input changed; output retained for inspection')
+    report=weight.recipe(path);row=report['records'][0]
+    result=weight.ingest(store,report)
+    with reg.db:
+        reg.remember(source)
+        reg.remember({'role':'model','path':str(out),'sha256':row['artifact_sha256'],'bytes':row['artifact_bytes']})
+    return save(store,'q4fit',row['artifact_sha256'],{'artifact_bytes':row['artifact_bytes'],'reference_sha256':source['sha256'],'weight_report_id':result['report_id'],'native_sha256':script['sha256'],'gguf_source_sha256':lib,'quantizer_sha256':binary['sha256'],'imatrix_sha256':matrix_ref['sha256'] if matrix_ref else None,'default':default,'overrides':manifest['overrides'],'scope':'Native Q4Fit build completed and output recipe verified; no inference or model quality claim.'})
