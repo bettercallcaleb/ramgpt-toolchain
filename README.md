@@ -356,3 +356,25 @@ Recommend screens the existing model catalog without rehashing model weights or 
 New EXL3 runs collect device-wide sampled NVML peak, free memory and sampling gaps. This is a lower bound on instantaneous peak and attributed conservatively to the entire session. EXL3 remains ineligible for resource-constrained recommendations until its runtime library provenance is frozen; old runs without telemetry are also excluded. No real EXL3 GPU measurement was performed in this increment.
 
 Tool-sync takes a read-only SQLite snapshot of another evidence store and copies only existing native receipts, native reports and weight reports using their original content identities. It does not copy registry paths, managed execution contracts or optimization decisions. Use the same destination --db and --evidence-db for later commands. Repeated sync is idempotent; if interrupted, rerun to complete the copy. The local integration test combined historical managed evidence and the native-tool workspace: 11 known model identities, four distinct observation cohorts, nine imported report/receipt records and zero new inference.
+
+
+## Four common commands
+
+The common entry points are build, run, recommend and passport. The original producer, evaluator and contract commands remain available.
+
+    ramgpt --tools-config tools.json build original-f16.gguf --out output/model.gguf --execute
+    ramgpt --tools-config tools.json build /path/to/local-source --out output/exl3 --gpu-uuid GPU_UUID --bits 4 --execute
+    ramgpt run model.gguf --spec model-specific-spec.json --seed 931 --budgets 256 --out output/measurement --max-requests 9 --max-completion-tokens 2112
+    ramgpt run MEASUREMENT_PLAN_ID --execute
+    ramgpt --tools-config tools.json run /path/to/imported-exl3 --dataset tasks.json --gpu-uuid GPU_UUID --out output/eval --budgets 256 --max-requests 8 --max-completion-tokens 2048 --execute
+    ramgpt recommend --vram 24GiB --min-accuracy 0.85 --objective memory
+    ramgpt passport MODEL_SHA256 --out model.passport.json
+    ramgpt passport-verify model.passport.json --local
+
+Build recognizes a floating-point GGUF input file or a materialized unquantized source directory. It delegates to Q4Fit or the official ExLlamaV3 converter respectively; it does not implicitly convert a Hugging Face directory to GGUF. Incompatible backend-specific options are rejected. Use --format to require a particular input type.
+
+Run accepts a GGUF path plus its model-specific base spec (including the native template, runtime and GPU settings), a registered measurement plan ID, an imported EXL3 directory plus dataset, or an existing frozen contract ID. GGUF model preparation defaults to a single f16 KV arm; --kv can select more arms. Without --execute, the GGUF model command prepares a bounded plan only. Existing direct contract execution remains backward compatible (requires --out, does not newly require --execute); use --archive for complete native evaluations. EXL3 requires explicit execution, and its adapter remains Qwen3-only. No new benchmark is introduced.
+
+The passport alias now defaults to the consolidated v2 summary. The existing passport-export command retains its v1 GGUF output by default; --consolidated requests v2. V2 accepts a GGUF path/hash or EXL3 namespaced identity, and a registered EXL3 directory with the configured native manifest script. It preserves the existing GGUF passport where available and includes selected native producer/scoring summaries, explicitly missing axes, and the EXL3 directory manifest when applicable. Unbound historical paired reports are not attached to arbitrary model identities. Raw responses, local paths and device UUIDs are excluded. Passport-verify accepts both schemas and supports local snapshot verification and optional model byte verification. These are not signed certificates.
+
+Local checks: common GGUF run created a real native frozen plan with 8 workload requests plus 1 smoke request and a 2112-token completion cap, with zero inference. The consolidated passports for the existing repaired 27B, Q4 IFEval and Q2 managed runtime evidence exported successfully; the repaired and Q2 local snapshots verified. EXL3 dispatch and manifest verification were tested on fixtures; actual EXL3 GPU execution remains pending.

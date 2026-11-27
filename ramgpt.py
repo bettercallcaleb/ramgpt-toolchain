@@ -18,7 +18,7 @@ def main():
     c=sub.add_parser('contract');c.add_argument('id')
     v=sub.add_parser('verify');v.add_argument('id')
     m=sub.add_parser('runtime-smoke');m.add_argument('id');m.add_argument('--out',required=True)
-    n=sub.add_parser('run');n.add_argument('id');n.add_argument('--out',required=True);n.add_argument('--max-new',type=int)
+    n=sub.add_parser('run');n.add_argument('id');n.add_argument('--out');n.add_argument('--max-new',type=int);n.add_argument('--format',choices=['gguf','exl3']);n.add_argument('--spec');n.add_argument('--dataset');n.add_argument('--seed',type=int);n.add_argument('--variants',type=int);n.add_argument('--budgets',type=int,nargs='+');n.add_argument('--strategies',nargs='+');n.add_argument('--reserve',type=int);n.add_argument('--kv',nargs='+');n.add_argument('--context',type=int);n.add_argument('--max-requests',type=int);n.add_argument('--max-completion-tokens',type=int);n.add_argument('--native');n.add_argument('--backend');n.add_argument('--python');n.add_argument('--evaluator');n.add_argument('--gpu-uuid');n.add_argument('--execute',action='store_true');n.add_argument('--archive',action='store_true')
     e=sub.add_parser('score');e.add_argument('id');e.add_argument('--run',required=True);e.add_argument('--out',required=True)
     q=sub.add_parser('prepare');q.add_argument('--dataset',required=True);q.add_argument('--evaluator');q.add_argument('--budgets',type=int,nargs='+',required=True);q.add_argument('--strategies',nargs='+',required=True);q.add_argument('--reserve',type=int);q.add_argument('--out',required=True)
     z=sub.add_parser('archive-run');z.add_argument('id');z.add_argument('--run',required=True);z.add_argument('--report')
@@ -38,7 +38,7 @@ def main():
     z=sub.add_parser('joint-select');z.add_argument('--policy',required=True);z.add_argument('--anchor',required=True);z.add_argument('--budget',type=int,required=True);z.add_argument('--strategy',required=True);z.add_argument('--reserve',type=int);z.add_argument('--validation-seed',type=int,required=True);z.add_argument('evaluation_ids',nargs='+')
     z=sub.add_parser('joint-prepare');z.add_argument('decision_id');z.add_argument('--out',required=True)
     z=sub.add_parser('joint-validate');z.add_argument('decision_id');z.add_argument('evaluation_ids',nargs=2)
-    z=sub.add_parser('passport-export',aliases=['passport']);z.add_argument('artifact');z.add_argument('--out',required=True)
+    z=sub.add_parser('passport-export',aliases=['passport']);z.add_argument('artifact');z.add_argument('--out',required=True);z.add_argument('--consolidated',action='store_true');z.add_argument('--native')
     z=sub.add_parser('passport-verify');z.add_argument('path');z.add_argument('--expected-id');z.add_argument('--model');z.add_argument('--local',action='store_true')
     z=sub.add_parser('doctor');z.add_argument('--evaluator');z.add_argument('--runtime');z.add_argument('--model');z.add_argument('--gpu',action='store_true')
     z=sub.add_parser('optimize');z.add_argument('model');z.add_argument('--vram',required=True);z.add_argument('--objective',choices=['balanced','memory','latency','tokens'],default='balanced');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--min-tasks',type=int,default=8);z.add_argument('--headroom',default='1GiB');z.add_argument('--context',type=int);z.add_argument('--max-sample-gap',type=float,default=.25);z.add_argument('--fidelity-report');z.add_argument('--max-kl',type=float);z.add_argument('--out')
@@ -61,7 +61,7 @@ def main():
     z=sub.add_parser('tool-sync');z.add_argument('source_evidence_db')
     z=sub.add_parser('tools')
     z=sub.add_parser('model-info');z.add_argument('subject',nargs='?')
-    z=sub.add_parser('build');z.add_argument('model');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--quantizer');z.add_argument('--default',default='Q4_K');z.add_argument('--set',action='append',default=[]);z.add_argument('--threads',type=int,default=12);z.add_argument('--imatrix');z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('build');z.add_argument('model');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--quantizer');z.add_argument('--default');z.add_argument('--set',action='append',default=[]);z.add_argument('--threads',type=int);z.add_argument('--imatrix');z.add_argument('--format',choices=['gguf','exl3']);z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid');z.add_argument('--bits',type=float);z.add_argument('--execute',action='store_true')
     args=p.parse_args()
     reg=None
     try:
@@ -81,7 +81,11 @@ def main():
             store=evidence.Store(args.evidence_db) if args.local else None
             try:
                 packet=read_json(args.path)
-                if args.local:
+                import model_passport
+                if packet.get('schema')==model_passport.SCHEMA:
+                    if args.local:reg=Registry(args.db)
+                    result=model_passport.verify_model(packet,args.expected_id,args.model,reg,store)
+                elif args.local:
                     reg=Registry(args.db)
                     result=passport.verify_local(reg,store,packet,args.expected_id,args.model)
                 else:result=passport.verify_model(packet,args.expected_id,args.model)
@@ -119,8 +123,8 @@ def main():
                 elif args.action=='tool-sync':
                     result=workspace.sync_native(store,args.source_evidence_db)
                 elif args.action=='build':
-                    import native_tools
-                    result=native_tools.q4fit_build(reg,store,args.model,args.out,args.native,args.gguf_root,args.quantizer,args.default,args.set,args.threads,args.imatrix,args.execute)
+                    import frontdoor
+                    result=frontdoor.build(reg,store,args,cfg)
                 elif args.action=='model-info':
                     result=workspace.model_info(reg,store,args.subject) if args.subject else workspace.models(reg,store)
                 elif args.action=='exl3-preflight':
@@ -175,7 +179,10 @@ def main():
                     if args.out:evaluation.write_new(args.out,result)
                 elif args.action in ('passport-export','passport'):
                     import passport
-                    result=passport.export(reg,store,args.artifact,args.out)
+                    if args.consolidated or args.action=='passport' or args.artifact.startswith('exl3:'):
+                        import model_passport
+                        result=model_passport.export(reg,store,args.artifact,args.out,args.native or cfg.get('exl3-first-mover',{}).get('native'))
+                    else:result=passport.export(reg,store,args.artifact,args.out)
                 elif args.action.startswith('joint-'):
                     import joint
                     if args.action=='joint-select':result=joint.freeze(store,args.evaluation_ids,args.anchor,[args.budget,args.strategy,args.reserve],read_json(args.policy),args.validation_seed)
@@ -219,8 +226,10 @@ def main():
             import evaluation
             result=evaluation.score(reg,args.id,args.run,args.out)
         elif args.action=='run':
-            import inference
-            result=inference.run(reg,args.id,args.out,args.max_new,evidence_db=args.evidence_db)
+            import evidence,frontdoor
+            store=evidence.Store(args.evidence_db)
+            try:result=frontdoor.run(reg,store,args,cfg)
+            finally:store.close()
         else:
             import runtime
             if 'measurement_cohort_key' in reg.contract(args.id)['workload']:raise ValueError('Use measurement-run for bounded measurement contracts')

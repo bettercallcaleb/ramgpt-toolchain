@@ -50,6 +50,7 @@ def catalog(config):
 
 def apply(args,config):
     action=args.action
+    if action=='build' and hasattr(args,'format'):return
     mapping={'build':'q4fit','healer-compose':'gguf-healer','healer-import':'gguf-healer','ladder-import':'conceptladder','exl3-run':'exl3-first-mover','exl3-build':'exl3-first-mover','exl3-preflight':'exl3-first-mover','exl3-import':'exl3-first-mover','heretic-import':'hereticbench','runtime-prepare':'llama-autotune','router-parity':'budgetfit','prepare':'budgetfit'}
     tool=mapping.get(action)
     if action=='weight-import' and args.kind!='recipe':tool=args.kind
