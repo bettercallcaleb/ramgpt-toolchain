@@ -86,10 +86,13 @@ def capture_sessions(out):
 def read_committed(out,rows,cid):
     return validate_sessions(capture_sessions(out),rows,cid)
 
-def run(reg,cid,out,max_new=None,timeout=120,evidence_db=None):
+def run(reg,cid,out,max_new=None,timeout=120,evidence_db=None,measurement_authorized=False):
     if max_new is not None and (type(max_new) is not int or max_new<1):raise ValueError('Invalid max-new')
     if not math.isfinite(timeout) or timeout<=0:raise ValueError('Invalid timeout')
-    plan=reg.contract(cid);rows=schedule(plan)
+    plan=reg.contract(cid)
+    w=plan.get('workload',{})
+    if 'measurement_cohort_key' in w and not ('joint_decision_id' in w or 'router_decision_id' in w) and (measurement_authorized is not True or max_new is not None):raise ValueError('Use measurement-run for bounded measurement contracts')
+    rows=schedule(plan)
     if plan.get('workload',{}).get('evaluator')=='BudgetFit 0.6.0':
         import evaluation
         evaluation.validate_schedule(plan,rows)

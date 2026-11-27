@@ -241,3 +241,16 @@ The default constraints are 85% joint accuracy, eight tasks, zero truncations, 1
 Balanced keeps nondominated configurations without combining metrics into a weighted score. Memory, latency and tokens may select an exploratory pick within each eligible cohort. The output always marks deployment unauthorized and reports missing evidence or next steps. New models without measurements return measurement_required; unsuitable historical evidence returns no_eligible_candidate. There is no GPU inference, automatic holdout or quantization in this command. Optional --out writes a new path-free JSON plan without overwriting existing files.
 
 The first integration replay used existing sealed Q2 evidence only. Under the default accuracy floor no calibration profile was eligible. At an explicitly lower floor of 50%, the F16 KV calibration was an exploratory candidate, while Q8_0 was excluded for its previously failed held-out validation. No holdout was rerun, no evidence was reclassified, and no deployment recommendation was issued.
+
+
+## Bounded measurement planning (v0.2 development)
+
+    ramgpt measurement-prepare --spec base-spec.json --out state/calibration-01 --seed 613 --budgets 256 1024 --kv f16 q8_0 --max-requests 34 --max-completion-tokens 20608
+    ramgpt measurement-run PLAN_ID --execute
+    ramgpt optimize model.gguf --vram 24GiB --objective balanced --min-accuracy 0.85
+
+Use a trusted base experiment specification with model, runtime, rendered template probe, pinned BudgetFit evaluator and execution settings (see G1/G2). Existing dataset/configuration inputs are replaced by the native Core manifest and schedule. The planner freezes all arms and runtime dependencies before execution. Only the KV cache type is varied across arms; the native budget/strategy matrix is shared. Both smoke completions and workload completions count toward the explicit caps. Prompt tokens, elapsed time and hardware capacity are not guaranteed by these caps.
+
+Preparation does not launch the model or submit inference requests. Execution requires the registered plan ID and explicit --execute. One full session per arm is permitted by this orchestration path. The start marker is persisted before launching; interrupted or missing started runs fail closed rather than silently retrying. Complete sealed runs are archived with the existing native evaluator and repeated invocations reuse the same archived evidence. Direct run/runtime-smoke commands are blocked for measurement calibration contracts. This is an application-level workflow guard, not a security sandbox or machine-wide quota.
+
+A real archived-model preparation test froze two KV arms and 32 workload requests plus two smoke requests, with a total 20,608 completion-token cap; no GPU run was launched. The complete execution/archive/idempotency path was tested using a simulated runtime and the real pinned native evaluator. Actual backend compatibility, KV support, available GPU memory and performance remain subject to live verification. The measurement plan is private local state and does not authorize deployment.
