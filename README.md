@@ -132,3 +132,38 @@ For offline installation, place the five named repository tar.gz archives and bu
 ConceptLadder v0.5 remains an external dependency: the public v0.4 source lacks the required measurement adapter. GGUF-Healer requires a compatible local script; EXL3 needs a separately installed backend and Python environment. Optional components are explicitly marked unconfigured rather than silently substituted. A public-only bundle with a suitable llama.cpp installation configures six adapters by path; supplying existing external paths can configure all nine. Configuration presence is not execution certification.
 
 Integration checks: online and offline bundle installation; exact historical Q4Fit and QuantBench replay; real Qwen3-0.6B floating-point GGUF conversion through the supplied public Q4Fit source, yielding the same Q4_K artifact SHA-256 as the prior verified build. No new GPU inference in this increment.
+
+
+## Tune a model with one command (v0.3.0 development)
+
+After installing the package and configuring the verified native bundle:
+
+```bash
+ramgpt supply --llama-root /path/to/llama.cpp --out native --execute
+export RAMGPT_TOOLS_CONFIG="$PWD/native"
+ramgpt tune /path/to/model.gguf --vram 24GiB --execute
+```
+
+The llama.cpp executable and GPU Python dependency must already work. Tune automatically uses the only idle GPU (or an explicitly selected --gpu-uuid), captures a native runtime specification, freezes the calibration and holdout workload, evaluates the candidate configurations, and exports the model passport under tuning/search. The default pilot searches f16 and q8_0 KV cache with 256 and 1024 total completion-token budgets, reserving at most 52 completion requests and 37,120 completion tokens including smoke and holdout requests. Omit --execute for a read-only workload preview; it runs no GPU model load or generation. Change --out for an independent new experiment. A failed or interrupted capture is retained rather than silently retried. The VRAM target is an observed-memory selection constraint, not an allocator limit. No selected profile is emitted unless a distinct challenger passes independent validation.
+
+## Verified GGUF cache
+
+```bash
+ramgpt model-add /path/to/model.gguf --execute
+ramgpt tune MODEL_SHA256 --vram 24GiB --execute
+```
+
+Model-add copies a local single-file GGUF into state/models/SHA256/model.gguf, verifies the bytes and registers the artifact. Repeated imports reuse the verified file. Tune also accepts ordinary paths; caching is optional. Use --cache to choose another cache root.
+
+To acquire a public Hugging Face GGUF, provide the immutable repository commit, exact filename, expected LFS SHA-256 and byte count from the model repository:
+
+```bash
+ramgpt model-fetch ggml-org/tiny-llamas stories260K.gguf \
+  --revision 99dd1a73db5a37100bd4ae633f4cfce6560e1567 \
+  --sha256 047bf46455a544931cff6fef14d7910154c56afbc23ab1c5e56a72e69912c04b \
+  --bytes 1185376 --execute
+```
+
+This tiny public file is a download/cache demonstration, not a recommended chat model. Downloads are bounded by the explicit byte count, checked against SHA-256 and the supported GGUF header, and published into the cache only after verification. No authentication tokens, automatic moving-branch resolution, multi-shard GGUF or EXL3 download support is included. A cache hit verifies content, not historical repository ownership. The model-fetch result records the requested source; model identity is the verified file hash.
+
+Actual integration check: tune automatically captured the template and executed 16 workload requests plus two transport checks for the existing Qwen3-0.6B GGUF, with no eligible configuration at the fixed accuracy floor; no holdout was executed. Both local 429 MB import and a real 1.19 MB public Hugging Face download were verified, and repeat imports transferred zero new bytes. The GPU returned to baseline. Positive holdout behavior remains covered by the existing synthetic-runtime tests, not a new real positive-control result.

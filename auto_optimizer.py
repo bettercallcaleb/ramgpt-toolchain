@@ -12,16 +12,12 @@ from registry import digest,fingerprint,read_json
 
 SCHEMA='ramgpt-autooptimizer-v1'
 
-def prepare_request(model,spec_path,budgets,kv,seed,validation_seed,variants,reserve,vram,headroom,objective,min_accuracy,max_requests,max_tokens):
+def workload(archive,budgets,kv,seed,validation_seed,variants,reserve,vram,headroom,objective,min_accuracy,max_requests,max_tokens):
     mp.limits(budgets,['allocated'],reserve,kv,seed,variants,max_requests,max_tokens)
     if type(validation_seed) is not int or not 0<=validation_seed<2**31 or seed==validation_seed:raise ValueError('Require distinct calibration and validation seeds')
     if 'f16' not in kv:raise ValueError('Require f16 anchor')
     if objective not in joint.OBJECTIVES:raise ValueError('Choose memory, latency or tokens')
-    spec=read_json(spec_path);runtime_spec.check_binding(spec)
-    inputs={r['role']:r['path'] for r in spec['inputs'] if r['role']!='runtime_dependency'}
-    model_ref=fingerprint(model,'model')
-    if fingerprint(inputs['model'],'model')!=model_ref:raise ValueError('Spec model mismatch')
-    archive=fingerprint(inputs['evaluator'],'evaluator')
+    archive=fingerprint(archive,'evaluator')
     if archive['sha256']!=adaptive.PIN:raise ValueError('Pinned evaluator required')
     p=planner.policy(vram,objective,min_accuracy,8,headroom,None,.25,None,None)
     policy={'objective':objective,'min_accuracy':min_accuracy,'max_latency_s':120,'max_sampled_peak_bytes':p['vram_bytes']-p['headroom_bytes'],'min_free_bytes':p['headroom_bytes'],'max_mean_tokens':max(budgets),'max_truncation':0,'min_tasks':8*variants,'max_validation_drop':.125,'accuracy_tolerance':0,'fidelity_report_id':None,'max_kl':None,'max_artifact_bytes':p['vram_bytes']-p['headroom_bytes'],'max_sample_gap_s':.25}
@@ -36,8 +32,15 @@ def prepare_request(model,spec_path,budgets,kv,seed,validation_seed,variants,res
     hold=workflow.holdout_cost(n,[max(budgets)],[max(budgets)])
     total={k:cal[k]+hold[k] for k in ('total_completion_requests','total_completion_token_cap')}
     mp.check_cost(total,max_requests,max_tokens)
-    req={'schema':SCHEMA,'model':model_ref,'spec':fingerprint(spec_path,'configuration'),'budgets':budgets,'kv':kv,'seed':seed,'validation_seed':validation_seed,'variants':variants,'reserve':reserve,'policy':policy,'anchor':[max(budgets),'allocated',reserve],'calibration_manifest':digest(manifests[0]),'validation_manifest':digest(manifests[1]),'calibration_cost':cal,'max_holdout_cost':hold,'max_total_cost':total,'max_requests':max_requests,'max_completion_tokens':max_tokens}
-    return req,manifests
+    return {'budgets':budgets,'kv':kv,'seed':seed,'validation_seed':validation_seed,'variants':variants,'reserve':reserve,'policy':policy,'anchor':[max(budgets),'allocated',reserve],'calibration_manifest':digest(manifests[0]),'validation_manifest':digest(manifests[1]),'calibration_cost':cal,'max_holdout_cost':hold,'max_total_cost':total,'max_requests':max_requests,'max_completion_tokens':max_tokens},manifests
+
+def prepare_request(model,spec_path,budgets,kv,seed,validation_seed,variants,reserve,vram,headroom,objective,min_accuracy,max_requests,max_tokens):
+    spec=read_json(spec_path);runtime_spec.check_binding(spec)
+    inputs={r['role']:r['path'] for r in spec['inputs'] if r['role']!='runtime_dependency'}
+    model_ref=fingerprint(model,'model')
+    if fingerprint(inputs['model'],'model')!=model_ref:raise ValueError('Spec model mismatch')
+    w,manifests=workload(inputs['evaluator'],budgets,kv,seed,validation_seed,variants,reserve,vram,headroom,objective,min_accuracy,max_requests,max_tokens)
+    return {'schema':SCHEMA,'model':model_ref,'spec':fingerprint(spec_path,'configuration'),**w},manifests
 
 def check_prior(store,manifest):
     prompts={' '.join(t['prompt'].split()) for t in manifest['tasks']}

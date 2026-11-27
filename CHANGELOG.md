@@ -5,6 +5,8 @@
 - Minimal verified GGUF dependency setup and executable option checks.
 - Commit-pinned native source supply bundle, archive integrity verification, offline installation and directory-based configuration.
 - Versioned transport smoke diagnostics; legacy strict contracts unchanged.
+- One-command GGUF tune with automatic runtime capture, explicit cost preview and unique-idle-GPU selection.
+- Verified content-addressed GGUF cache and immutable-revision public Hugging Face downloads.
 - Bounded AutoOptimizer orchestration for KV precision and generation budgets, with independent holdout and selected profile export.
 - Separate Q4Fit recipe-builder and evidence-script configuration.
 

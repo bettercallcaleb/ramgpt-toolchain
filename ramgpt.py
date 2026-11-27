@@ -43,6 +43,9 @@ def main():
     z=sub.add_parser('passport-verify');z.add_argument('path');z.add_argument('--expected-id');z.add_argument('--model');z.add_argument('--local',action='store_true')
     z=sub.add_parser('doctor');z.add_argument('--evaluator');z.add_argument('--runtime');z.add_argument('--model');z.add_argument('--gpu',action='store_true')
     z=sub.add_parser('optimize');z.add_argument('model');z.add_argument('--vram',required=True);z.add_argument('--objective',choices=['balanced','memory','latency','tokens'],default='balanced');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--min-tasks',type=int,default=8);z.add_argument('--headroom',default='1GiB');z.add_argument('--context',type=int);z.add_argument('--max-sample-gap',type=float,default=.25);z.add_argument('--fidelity-report');z.add_argument('--max-kl',type=float);z.add_argument('--out')
+    z=sub.add_parser('model-add');z.add_argument('path');z.add_argument('--cache',default='state/models');z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('model-fetch');z.add_argument('repo');z.add_argument('filename');z.add_argument('--revision',required=True);z.add_argument('--sha256',required=True);z.add_argument('--bytes',type=int,required=True);z.add_argument('--cache',default='state/models');z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('tune');z.add_argument('model');z.add_argument('--cache',default='state/models');z.add_argument('--out',default='tuning');z.add_argument('--vram',required=True);z.add_argument('--gpu-uuid');z.add_argument('--context',type=int,default=4096);z.add_argument('--port',type=int,default=18429);z.add_argument('--threads',type=int,default=8);z.add_argument('--gpu-layers',type=int,default=999);z.add_argument('--headroom',default='1GiB');z.add_argument('--objective',choices=['memory','latency','tokens'],default='memory');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--budgets',type=int,nargs='+',default=[256,1024]);z.add_argument('--kv',nargs='+',default=['f16','q8_0']);z.add_argument('--seed',type=int,default=941);z.add_argument('--validation-seed',type=int,default=942);z.add_argument('--variants',type=int,default=1);z.add_argument('--reserve',type=int,default=64);z.add_argument('--max-requests',type=int,default=52);z.add_argument('--max-completion-tokens',type=int,default=37120);z.add_argument('--execute',action='store_true')
     z=sub.add_parser('auto-optimize');z.add_argument('model');z.add_argument('--spec',required=True);z.add_argument('--out',required=True);z.add_argument('--vram',required=True);z.add_argument('--headroom',default='1GiB');z.add_argument('--objective',choices=['memory','latency','tokens'],default='memory');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--budgets',type=int,nargs='+',default=[256,1024]);z.add_argument('--kv',nargs='+',default=['f16','q8_0']);z.add_argument('--seed',type=int,required=True);z.add_argument('--validation-seed',type=int,required=True);z.add_argument('--variants',type=int,default=1);z.add_argument('--reserve',type=int,default=64);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True);z.add_argument('--execute',action='store_true')
     z=sub.add_parser('measurement-prepare');z.add_argument('--spec',required=True);z.add_argument('--out',required=True);z.add_argument('--seed',type=int,required=True);z.add_argument('--variants',type=int,default=1);z.add_argument('--budgets',type=int,nargs='+',required=True);z.add_argument('--strategies',nargs='+',default=['allocated']);z.add_argument('--reserve',type=int,default=64);z.add_argument('--kv',nargs='+',default=['f16','q8_0']);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True)
     z=sub.add_parser('measurement-run');z.add_argument('plan_id');z.add_argument('--execute',action='store_true')
@@ -124,7 +127,10 @@ def main():
             print(json.dumps(result,indent=2,ensure_ascii=False,allow_nan=False))
             return 0
         reg=Registry(args.db)
-        if args.action=='register':result=reg.register(args.path,args.role)
+        if args.action in ('model-add','model-fetch'):
+            import model_cache
+            result=model_cache.add(reg,args.path,args.cache,args.execute) if args.action=='model-add' else model_cache.fetch(reg,args.repo,args.revision,args.filename,args.sha256,args.bytes,args.cache,args.execute)
+        elif args.action=='register':result=reg.register(args.path,args.role)
         elif args.action=='artifact':result=reg.get(args.sha256)
         elif args.action=='freeze':result=reg.freeze(read_json(args.spec))
         elif args.action=='contract':result=reg.contract(args.id)
@@ -141,11 +147,14 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('auto-optimize','recommend','tool-sync','build','model-info','exl3-run','cross-compare','exl3-build','exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('tune','auto-optimize','recommend','tool-sync','build','model-info','exl3-run','cross-compare','exl3-build','exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
-                if args.action=='auto-optimize':
+                if args.action=='tune':
+                    import quick_tune,model_cache
+                    result=quick_tune.run(reg,store,model_cache.resolve(args.model,args.cache),args.out,cfg,args.gpu_uuid,args.context,args.port,args.threads,args.gpu_layers,args.budgets,args.kv,args.seed,args.validation_seed,args.variants,args.reserve,args.vram,args.headroom,args.objective,args.min_accuracy,args.max_requests,args.max_completion_tokens,args.execute)
+                elif args.action=='auto-optimize':
                     import auto_optimizer
                     result=auto_optimizer.run(reg,store,args.model,args.spec,args.out,args.budgets,args.kv,args.seed,args.validation_seed,args.variants,args.reserve,args.vram,args.headroom,args.objective,args.min_accuracy,args.max_requests,args.max_completion_tokens,args.execute)
                 elif args.action=='recommend':
