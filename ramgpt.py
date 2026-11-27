@@ -57,6 +57,8 @@ def main():
     z=sub.add_parser('exl3-import');z.add_argument('folder');z.add_argument('manifest');z.add_argument('--native')
     z=sub.add_parser('heretic-import');z.add_argument('--native');z.add_argument('--dataset',required=True);z.add_argument('--base',required=True);z.add_argument('--variant',required=True);z.add_argument('--track',choices=['retention','epistemic'],required=True)
     z=sub.add_parser('tool-reports');z.add_argument('--tool',choices=['exl3-first-mover','hereticbench'])
+    z=sub.add_parser('recommend');z.add_argument('--candidate',action='append');z.add_argument('--vram',required=True);z.add_argument('--objective',choices=['balanced','memory','latency','tokens'],default='balanced');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--min-tasks',type=int,default=8);z.add_argument('--headroom',default='1GiB');z.add_argument('--context',type=int);z.add_argument('--max-sample-gap',type=float,default=.25);z.add_argument('--fidelity-report');z.add_argument('--max-kl',type=float);z.add_argument('--max-model-size');z.add_argument('--manifest');z.add_argument('--gpu-name');z.add_argument('--out')
+    z=sub.add_parser('tool-sync');z.add_argument('source_evidence_db')
     z=sub.add_parser('tools')
     z=sub.add_parser('model-info');z.add_argument('subject',nargs='?')
     z=sub.add_parser('build');z.add_argument('model');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--quantizer');z.add_argument('--default',default='Q4_K');z.add_argument('--set',action='append',default=[]);z.add_argument('--threads',type=int,default=12);z.add_argument('--imatrix');z.add_argument('--execute',action='store_true')
@@ -105,11 +107,18 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('build','model-info','exl3-run','cross-compare','exl3-build','exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('recommend','tool-sync','build','model-info','exl3-run','cross-compare','exl3-build','exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
-                if args.action=='build':
+                if args.action=='recommend':
+                    import portfolio,planner
+                    policy=planner.policy(args.vram,args.objective,args.min_accuracy,args.min_tasks,args.headroom,args.context,args.max_sample_gap,args.fidelity_report,args.max_kl)
+                    result=portfolio.select(store,reg,policy,args.candidate,planner.bytes_arg(args.max_model_size) if args.max_model_size else None,args.manifest,args.gpu_name)
+                    if args.out:evaluation.write_new(args.out,result)
+                elif args.action=='tool-sync':
+                    result=workspace.sync_native(store,args.source_evidence_db)
+                elif args.action=='build':
                     import native_tools
                     result=native_tools.q4fit_build(reg,store,args.model,args.out,args.native,args.gguf_root,args.quantizer,args.default,args.set,args.threads,args.imatrix,args.execute)
                 elif args.action=='model-info':

@@ -342,3 +342,17 @@ Use the same native manifest, budget matrix and pinned evaluator as the managed 
 Cross-compare requires the same task manifest, exact native prompt schedule, evaluator and scoring adapter, and the same budget/strategy/reserve matrix. The two model formats keep distinct identities, and EXL3 results stay in native reports rather than entering GGUF-only optimization contracts. The comparison exposes separate profile values; template, tokenizer, KV caching, runtime and hardware conditions can differ, so it does not establish weight fidelity, causal speed differences or deployment readiness.
 
 Local validation: the actual ExLlamaV3 Python environment imported the native backend and rendered the Qwen3-0.6B chat template successfully using a process-level system libstdc++ preload. Transformers/huggingface-hub versions were incompatible, which is why this initial text adapter uses the local template directly. Actual archived GGUF responses (16 rows, two profiles) scored identically through the new shared adapter; a temporary simulated EXL3 report exercised cross-compare. No real EXL3 GPU inference was performed in this increment, because the prior local EXL3 weights had been removed. The new producer/runner requires real-model validation before being considered production-ready.
+
+
+## Choose from the whole model catalog
+
+    ramgpt recommend --vram 24GiB --min-accuracy 0.85 --objective memory
+    ramgpt recommend --vram 24GiB --max-model-size 18GiB --objective balanced --context 4096
+    ramgpt recommend --vram 24GiB --candidate GGUF_SHA256 --candidate exl3:EXL3_ID
+    ramgpt tool-sync /path/to/other/evidence.sqlite
+
+Recommend screens the existing model catalog without rehashing model weights or running inference. Use --manifest and --gpu-name to restrict observations to a workload and hardware name. The result lists native producer/evaluation references, missing evidence, candidate rejections and an exploratory Pareto frontier per compatible cohort. It does not rank unrelated workloads or mix backend-specific timing/token measurements into a universal score. Historical failed holdouts remain exclusions through the existing GGUF planner. Fidelity limits require the existing matched QuantBench cohort. Native knowledge/IFEval receipts are shown as separate evidence, not treated as substitutes for managed accuracy or memory.
+
+New EXL3 runs collect device-wide sampled NVML peak, free memory and sampling gaps. This is a lower bound on instantaneous peak and attributed conservatively to the entire session. EXL3 remains ineligible for resource-constrained recommendations until its runtime library provenance is frozen; old runs without telemetry are also excluded. No real EXL3 GPU measurement was performed in this increment.
+
+Tool-sync takes a read-only SQLite snapshot of another evidence store and copies only existing native receipts, native reports and weight reports using their original content identities. It does not copy registry paths, managed execution contracts or optimization decisions. Use the same destination --db and --evidence-db for later commands. Repeated sync is idempotent; if interrupted, rerun to complete the copy. The local integration test combined historical managed evidence and the native-tool workspace: 11 known model identities, four distinct observation cohorts, nine imported report/receipt records and zero new inference.

@@ -11,6 +11,7 @@ import inference
 import native_bridge as nb
 import native_tools as nt
 import runtime
+import telemetry
 
 def schedule(archive,manifest,budgets,strategies,reserve):
     if fingerprint(archive,'evaluator')['sha256']!=adaptive.PIN:raise ValueError('Pinned BudgetFit archive required')
@@ -60,17 +61,19 @@ def run(store,folder,dataset,archive,native,backend,python,gpu_uuid,out,budgets,
         state=runtime.gpu_state().get(gpu_uuid)
         if not state or runtime.compute_apps(gpu_uuid) or state['used_mib']>512:raise ValueError('Selected GPU occupied')
         cmd=[python,'-I',str(script),'--backend',str(backend),'--model',str(folder),'--context',str(context),'--schedule',str(out/'schedule.json'),'--out',str(out/'responses.jsonl')]
-        with (out/'runtime.log').open('x') as log:
+        with telemetry.MemoryTrace(gpu_uuid) as trace, (out/'runtime.log').open('x') as log:
             proc=subprocess.Popen(cmd,env=env,cwd=backend,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
             try:
                 if proc.wait()!=0:raise ValueError('Native EXL3 execution failed; see runtime.log')
             finally:
                 if proc.poll() is None:runtime.stop_owned(proc)
         if runtime.compute_apps(gpu_uuid) or runtime.gpu_state()[gpu_uuid]['used_mib']>state['used_mib']+128:raise ValueError('GPU did not return to baseline')
+    memory_trace=trace.report()
+    evaluation.write_new(out/'memory.json',memory_trace)
     observed=[json.loads(x) for x in (out/'responses.jsonl').read_text().splitlines()]
     if read_json(out/'schedule.json')!=sched or model_identity(store,folder,native)!=(aid,files) or source!=nt.tree(backend/'exllamav3') or native_ref!=nt.ref(native) or archive_ref!=nt.ref(archive) or dataset_ref!=nt.ref(dataset) or worker_ref!=nt.ref(script):raise ValueError('Run input changed')
     scored=score_rows(archive,manifest,sched,observed,budgets,strategies,reserve)
-    body={'kind':'shared-native-evaluation','manifest_sha256':digest(manifest),'schedule_sha256':digest(sched),'evaluator_sha256':archive_ref['sha256'],'adapter_sha256':evidence.adapter_hash(),'backend_source_sha256':source,'worker_sha256':worker_ref['sha256'],'artifact_bytes':sum(v['size'] for v in files.values()),'context':context,'sampling':'greedy','reasoning_policy':'Qwen3 local chat template enable_thinking=False; thinking output rejected','native_cache_policy':'native default; prefix reuse possible','gpu_name':state['name'],'requests':len(sched),'completion_cap':cost,'profiles':scored['profiles'],'rows':scored['rows'],'native_responses':observed,'scope':'Same native task scorer; tokenizer, template, cache and runtime can differ from GGUF. No fidelity or deployment claim.'}
+    body={'kind':'shared-native-evaluation','manifest_sha256':digest(manifest),'schedule_sha256':digest(sched),'evaluator_sha256':archive_ref['sha256'],'adapter_sha256':evidence.adapter_hash(),'backend_source_sha256':source,'worker_sha256':worker_ref['sha256'],'artifact_bytes':sum(v['size'] for v in files.values()),'context':context,'sampling':'greedy','reasoning_policy':'Qwen3 local chat template enable_thinking=False; thinking output rejected','native_cache_policy':'native default; prefix reuse possible','gpu_name':state['name'],'gpu_driver':state['driver'],'gpu_total_mib':state['total_mib'],'memory_trace':memory_trace,'requests':len(sched),'completion_cap':cost,'profiles':scored['profiles'],'rows':scored['rows'],'native_responses':observed,'scope':'Same native task scorer; tokenizer, template, cache and runtime can differ from GGUF. No fidelity or deployment claim.'}
     report=nb.save(store,'exl3-first-mover',{'format':'exl3','artifact_id':aid},body)
     evaluation.write_new(out/'evaluation.json',report)
     return {'report_id':report['report_id'],'artifact_id':aid,'requests':len(sched),'profiles':[x['budgetfit'] for x in scored['profiles']]}

@@ -104,7 +104,10 @@ def select_group(rows,p,failed):
     return {'status':'exploratory_frontier' if pf else 'no_eligible_candidate','screening':rows,'pareto':[r['candidate_id'] for r in pf],'exploratory_pick':selected}
 
 def build(reg,store,model,p):
-    model=reg.register(model,'model');aid=model['sha256']
+    return build_artifact(store,reg.register(model,'model'),p)
+
+def build_artifact(store,model,p):
+    aid=evidence.checked_id(model['sha256']);weight.size(model['bytes'])
     failed,history,holdout_eids=validation_history(store,aid)
     f=None
     if p['fidelity_report_id'] is not None:

@@ -116,3 +116,48 @@ def models(reg,store):
         if item['bytes']!=r['artifact_bytes']:raise ValueError('Conflicting EXL3 artifact size')
         item['sources'].add('exl3-native-evaluation' if r.get('kind')=='shared-native-evaluation' else 'exl3-first-mover')
     return {'models':[{**r,'sources':sorted(r['sources'])} for _,r in sorted(rows.items())],'scope':'Known local or historical model identities; not a claim that files are present, compatible or validated.'}
+
+def sync_native(target,source_path):
+    source_path=Path(source_path).expanduser().resolve(strict=True)
+    target_path=Path(target.db.execute('PRAGMA database_list').fetchone()[2]).resolve()
+    if source_path==target_path or source_path.samefile(target_path):raise ValueError('Source and destination must differ')
+    import sqlite3
+    import tempfile
+    tmp=tempfile.TemporaryDirectory()
+    snapshot=Path(tmp.name)/'source.sqlite'
+    try:
+        original=sqlite3.connect(source_path.as_uri()+'?mode=ro',uri=True)
+        copy=sqlite3.connect(snapshot)
+        try:original.backup(copy)
+        finally:copy.close();original.close()
+        source=evidence.Store(snapshot)
+    except BaseException:
+        tmp.cleanup()
+        raise
+    try:
+        reports=weight.find(source)
+        weights={r['report_id']:source.get(r['report_id']) for r in reports}
+        receipts=native_tools.find(source)
+        native_reports=native_bridge.find(source)
+        # Preserve content identities and relationships, not frozen runtime execution state.
+        for r in receipts:
+            linked=r.get('weight_report_id')
+            if linked and linked not in weights:
+                target.get(linked)
+        for r in native_reports:
+            linked=r.get('native_manifest_report_id')
+            if linked and linked not in {x['report_id'] for x in native_reports}:
+                target.get(linked)
+        prior_weight={r['report_id'] for r in weight.find(target)}
+        prior_receipt={r['receipt_id'] for r in native_tools.find(target)}
+        prior_report={r['report_id'] for r in native_bridge.find(target)}
+        for rid,body in sorted(weights.items()):
+            if weight.ingest(target,body)['report_id']!=rid:raise ValueError('Weight report identity mismatch')
+        for r in receipts:
+            body={k:v for k,v in r.items() if k not in ('receipt_id','schema','tool','artifact_sha256','deployment_authorized')}
+            if native_tools.save(target,r['tool'],r['artifact_sha256'],body)!=r:raise ValueError('Native receipt identity mismatch')
+        for r in native_reports:
+            body={k:v for k,v in r.items() if k not in ('report_id','schema','tool','subject','deployment_authorized')}
+            if native_bridge.save(target,r['tool'],r['subject'],body)!=r:raise ValueError('Native report identity mismatch')
+        return {'weight_reports_added':len(set(weights)-prior_weight),'native_receipts_added':len({r['receipt_id'] for r in receipts}-prior_receipt),'native_reports_added':len({r['report_id'] for r in native_reports}-prior_report),'new_inference_requests':0,'scope':'Copy existing native reports and weight evidence by content identity; managed run contracts, registry paths and frozen decisions are not copied.'}
+    finally:source.close();tmp.cleanup()
