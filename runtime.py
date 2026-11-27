@@ -44,6 +44,7 @@ def validate(plan):
         raise ValueError('Require frozen model, loopback host and one slot')
     if not opts.get('--jinja') or not opts.get('--no-webui') or opts.get('--reasoning')!='off' or e['reasoning_policy']!='off':
         raise ValueError('Require jinja, no web UI and reasoning off')
+    if e.get('smoke_policy','literal-v1') not in ('literal-v1','transport-v2'):raise ValueError('Unsupported smoke policy')
     sampling=e.get('sampling',{})
     if not isinstance(sampling,dict) or set(sampling)-SAMPLING_FLAGS.keys():raise ValueError('Unsupported sampling parameters')
     for name,value in sampling.items():
@@ -134,6 +135,16 @@ def check_usage(raw,cap):
     if type(u.get('completion_tokens')) is not int or not 1<=u['completion_tokens']<=cap:raise ValueError('Invalid completion usage')
     return u
 
+def transport_usage(raw,cap):
+    choices=raw.get('choices')
+    if not isinstance(choices,list) or len(choices)!=1:raise ValueError('Expected one smoke completion')
+    c=choices[0];m=c.get('message',{});u=raw.get('usage',{})
+    if c.get('finish_reason') not in ('stop','length') or not isinstance(m.get('content'),str) or not m['content'].strip() or m.get('tool_calls') or m.get('reasoning_content') or m.get('reasoning') or any(x in m['content'] for x in ('<think>','</think>')):raise ValueError('Invalid transport smoke response')
+    for k in ('prompt_tokens','completion_tokens','total_tokens'):
+        if type(u.get(k)) is not int or u[k]<0:raise ValueError('Invalid smoke usage')
+    if not 1<=u['completion_tokens']<=cap or u['total_tokens']!=u['prompt_tokens']+u['completion_tokens']:raise ValueError('Invalid smoke token accounting')
+    return u, c['finish_reason']=='stop' and m['content'].strip()=='42'
+
 def mapped_libraries(pid,plan):
     bound={r['path']:r for r in plan['inputs'] if r['role']=='runtime_dependency'}
     paths=set()
@@ -198,7 +209,11 @@ def smoke(reg,cid,out,timeout=90,work=None):
                     receipt['smoke_elapsed_s']=time.monotonic()-start
                     atomic(out/'smoke_response.json',raw)
                     if not owns_listener(proc.pid,port):raise ValueError('Server listener ownership lost')
-                    receipt['usage']=check_usage(raw,64)
+                    policy=plan['execution'].get('smoke_policy','literal-v1')
+                    if policy=='transport-v2':
+                        receipt['usage'],receipt['literal_instruction_pass']=transport_usage(raw,64)
+                        receipt['smoke_policy']=policy
+                    else:receipt['usage']=check_usage(raw,64)
                     if raw.get('model')!=alias:raise ValueError('Response alias mismatch')
                     receipt['response_identity']={k:raw[k] for k in ('model','system_fingerprint') if k in raw}
                     receipt['smoke_pass']=True;receipt['gpu_loaded']=gpu_state()[uuid]

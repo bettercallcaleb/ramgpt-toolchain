@@ -35,6 +35,18 @@ class RuntimeTests(unittest.TestCase):
             with self.assertRaises(ValueError):runtime.check_usage(bad,64)
         bad=copy.deepcopy(raw);bad['usage']['completion_tokens']=65
         with self.assertRaises(ValueError):runtime.check_usage(bad,64)
+    def test_transport_diagnostic(self):
+        raw={'choices':[{'finish_reason':'stop','message':{'content':'42.'}}],'usage':{'prompt_tokens':10,'completion_tokens':2,'total_tokens':12}}
+        self.assertFalse(runtime.transport_usage(raw,64)[1])
+        raw['choices'][0]['message']['content']='42'
+        self.assertTrue(runtime.transport_usage(raw,64)[1])
+        raw['choices'][0]['message']['content']='43'
+        self.assertFalse(runtime.transport_usage(raw,64)[1])
+        raw['usage']['total_tokens']=99
+        with self.assertRaises(ValueError):runtime.transport_usage(raw,64)
+        raw['usage']['total_tokens']=12
+        raw['choices'][0]['message']['content']='<think>42</think>'
+        with self.assertRaises(ValueError):runtime.transport_usage(raw,64)
     def test_stop_owned(self):
         p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)'])
         try:

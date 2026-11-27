@@ -19,7 +19,7 @@ def execution(model,gpu,port,context,threads,ngl):
         if type(n) is not int or not a<=n<=b:raise ValueError('Invalid runtime setting')
     args=['-m',model,'--alias','model','--host','127.0.0.1','--port',str(port),'-c',str(context),'-np','1','-ngl',str(ngl),'-t',str(threads),'--seed','602','--jinja','--reasoning','off','--reasoning-format','deepseek','--no-webui','--cache-type-k','f16','--cache-type-v','f16','--flash-attn','on','--batch-size','512','--ubatch-size','128','--device','CUDA0','--fit','off','--no-warmup']
     for k,v in SAMPLING.items():args.extend((runtime.SAMPLING_FLAGS[k],str(v)))
-    return {'runtime_args':args,'gpu_uuids':[gpu],'sampling':dict(SAMPLING),'reasoning_policy':'off','template_binding':'observed model-specific apply-template probe; no completion during capture','runtime_measurement':'nvml-sampled-v1'}
+    return {'runtime_args':args,'gpu_uuids':[gpu],'sampling':dict(SAMPLING),'reasoning_policy':'off','smoke_policy':'transport-v2','template_binding':'observed model-specific apply-template probe; no completion during capture','runtime_measurement':'nvml-sampled-v1'}
 
 def check_binding(spec):
     binding=spec.get('execution',{}).get('template_capture')

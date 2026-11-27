@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 (development)
+
+- Minimal verified GGUF dependency setup and executable option checks.
+- Pinned official llama.cpp CUDA 12.8 Linux x86_64 runtime and same-commit GGUF library supply; no local compilation required on supported hosts with CUDA libraries.
+- Commit-pinned native source supply bundle, archive integrity verification, offline installation and directory-based configuration.
+- Versioned transport smoke diagnostics; legacy strict contracts unchanged.
+- One-command GGUF tune with automatic runtime capture, explicit cost preview and unique-idle-GPU selection.
+- Verified content-addressed GGUF cache, public Hugging Face metadata listing, bounded downloads, immutable model source locks and direct tuning from a cached lock.
+- Bounded AutoOptimizer orchestration for KV precision and generation budgets, with independent holdout and selected profile export.
+- Separate Q4Fit recipe-builder and evidence-script configuration.
+
+
 ## 0.2.0rc1
 
 Release candidate for the unified local model toolchain.

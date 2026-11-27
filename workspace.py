@@ -19,11 +19,16 @@ TOOLS={
  'hereticbench':({'native':'directory'},['heretic-import'])
 }
 
-OPTIONAL={'conceptladder':{'ifeval_root','deps','nltk_data'},'exl3-first-mover':{'python'},'llama-autotune':{'runtime'}}
+OPTIONAL={'q4fit':{'evidence_script'},'conceptladder':{'ifeval_root','deps','nltk_data'},'exl3-first-mover':{'python'},'llama-autotune':{'runtime'}}
 
 def load(path):
     if path is None:return {}
-    p=Path(path).expanduser().resolve(strict=True);doc=read_json(p)
+    p=Path(path).expanduser().resolve(strict=True)
+    if p.is_dir():
+        import supply
+        supply.verify(p)
+        p=p/'tools.json'
+    doc=read_json(p)
     if not isinstance(doc,dict) or set(doc)!={'tools'} or not isinstance(doc['tools'],dict):raise ValueError('Expected tools configuration object')
     out={}
     for name,values in doc['tools'].items():
@@ -62,6 +67,9 @@ def apply(args,config):
     if action=='exl3-run' and not args.evaluator:
         args.evaluator=config.get('budgetfit',{}).get('evaluator')
         if not args.evaluator:raise ValueError('Supply --evaluator or configure budgetfit.evaluator')
+    if action=='weight-import' and args.kind=='q4fit' and args.native is None:
+        args.native=config.get('q4fit',{}).get('evidence_script')
+        if not args.native:raise ValueError('Supply --native q4evidence.py or configure q4fit.evidence_script')
     for k in keys:
         if getattr(args,k,None) is None:setattr(args,k,config.get(tool,{}).get(k))
         if not getattr(args,k,None):raise ValueError('Supply --'+k.replace('_','-')+' or configure '+tool+'.'+k)

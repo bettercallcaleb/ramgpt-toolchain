@@ -34,7 +34,7 @@ def snapshot(reg,cid,folder):
         meta={'schema':inference.RUN,'contract_id':cid,'schedule_digest':digest(rows),'planned':len(rows)}
         if read_json(p/'run.json')!=meta:raise ValueError('Run contract mismatch')
         sessions=inference.capture_sessions(p)
-        completed,identity,_=inference.validate_sessions(sessions,rows,cid)
+        completed,identity,_=inference.validate_sessions(sessions,rows,cid,plan["execution"].get("smoke_policy","literal-v1"))
         if len(completed)!=len(rows):raise ValueError('Run incomplete')
         manifest=read_json(refs['dataset']['path'])
         reg.verify(cid)
@@ -52,7 +52,7 @@ def validate_source(source):
     if meta!={'schema':inference.RUN,'contract_id':cid,'schedule_digest':digest(rows),'planned':len(rows)}:
         raise ValueError('Source schedule mismatch')
     if len(rows)!=plan['workload']['request_count']:raise ValueError('Source request count mismatch')
-    completed,identity,_=inference.validate_sessions(source['sessions'],rows,cid)
+    completed,identity,_=inference.validate_sessions(source['sessions'],rows,cid,plan['execution'].get('smoke_policy','literal-v1'))
     if len(completed)!=len(rows) or not completed or identity!=source['response_identity']:raise ValueError('Incomplete source evidence')
     return completed
 

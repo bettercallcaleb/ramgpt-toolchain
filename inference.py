@@ -53,13 +53,15 @@ def check_response(raw,expected,identity):
     if u['completion_tokens']>expected['max_tokens'] or u['total_tokens']!=u['prompt_tokens']+u['completion_tokens']:raise ValueError('Inconsistent usage')
     return {'finish_reason':finish,'prompt_tokens':u['prompt_tokens'],'completion_tokens':u['completion_tokens'],'total_tokens':u['total_tokens']}
 
-def validate_sessions(sessions,rows,cid):
+def validate_sessions(sessions,rows,cid,smoke_policy=None):
     completed=[];identity=None
     for i,session in enumerate(sessions):
         if session['name']!=f'session-{i:06d}':raise ValueError('Invalid session ordering')
         seal=session['seal'];receipt=session['receipt'];data=session['responses']
         if seal!={'contract_id':cid,'receipt_digest':digest(receipt),'responses_digest':digest(data),'start':len(completed),'count':len(data)}:raise ValueError('Session seal mismatch')
         if receipt.get('contract_id')!=cid or receipt.get('status')!='runtime_session_passed' or not all(receipt.get(x) is True for x in ('input_precheck','input_postcheck','smoke_pass','template_probe_match','cleanup_complete')):raise ValueError('Invalid runtime receipt')
+        if smoke_policy=='transport-v2' and (receipt.get('smoke_policy')!='transport-v2' or type(receipt.get('literal_instruction_pass')) is not bool):raise ValueError('Missing transport smoke diagnostic')
+        if smoke_policy=='literal-v1' and receipt.get('smoke_policy','literal-v1')!='literal-v1':raise ValueError('Unexpected smoke policy')
         ident=receipt['response_identity']
         if identity is not None and ident!=identity:raise ValueError('Session backend identity mismatch')
         identity=ident
