@@ -28,6 +28,13 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(args.gguf_root,str(self.p))
         self.assertFalse(workspace.catalog(cfg)['tools'][0]['configured'])
         self.assertEqual(len(workspace.catalog(cfg)['tools']),9)
+    def test_q4fit_evidence_separate_from_builder(self):
+        cfg={'q4fit':{'native':'q4fit.py','evidence_script':'q4evidence.py'}}
+        args=SimpleNamespace(action='weight-import',kind='q4fit',native=None)
+        workspace.apply(args,cfg)
+        self.assertEqual(args.native,'q4evidence.py')
+        args.native=None
+        with self.assertRaisesRegex(ValueError,'q4fit.evidence_script'):workspace.apply(args,{'q4fit':{'native':'q4fit.py'}})
     def test_unknown_tool_or_field(self):
         p=self.p/'tools.json'
         for tools in ({'unknown':{}},{'q4fit':{'publish':True}}):

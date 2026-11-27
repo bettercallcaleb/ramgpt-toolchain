@@ -3,7 +3,8 @@
     "q4fit": {
       "native": "/path/to/q4fit/q4fit.py",
       "quantizer": "/path/to/llama.cpp/build/bin/llama-quantize",
-      "gguf_root": "/path/to/llama.cpp/gguf-py"
+      "gguf_root": "/path/to/llama.cpp/gguf-py",
+      "evidence_script": "/path/to/q4fit/q4evidence.py"
     },
     "quantbench": {
       "native": "/path/to/quantbench/run-artifact-comparison.py"

@@ -11,7 +11,7 @@ def discover(roots,overrides=(),depth=3):
     def add(tool,key,path):
         p=Path(path)
         if not p.exists():return
-        kind=workspace.TOOLS[tool][0].get(key,'executable' if key in ('python','runtime') else 'directory')
+        kind=workspace.TOOLS[tool][0].get(key,'executable' if key in ('python','runtime') else 'file' if key=='evidence_script' else 'directory')
         if not (p.is_dir() if kind=='directory' else p.is_file() and (kind!='executable' or os.access(p,os.X_OK))):return
         value=os.path.abspath(p) if key=='python' else str(p.resolve())
         candidates.setdefault((tool,key),set()).add(value)
@@ -27,6 +27,7 @@ def discover(roots,overrides=(),depth=3):
             seen.add(p)
             if len(seen)>10000:raise ValueError('Discovery exceeded 10000 directories; specify narrower roots')
             if 'q4fit.py' in files and 'build' not in p.relative_to(root).parts:add('q4fit','native',p/'q4fit.py')
+            if 'q4evidence.py' in files and 'build' not in p.relative_to(root).parts:add('q4fit','evidence_script',p/'q4evidence.py')
             if 'run-artifact-comparison.py' in files:add('quantbench','native',p/'run-artifact-comparison.py')
             if (p/'conceptladder'/'measurement.py').is_file():add('conceptladder','native',p)
             if 'budgetfit.pyz' in files and fingerprint(p/'budgetfit.pyz','evaluator')['sha256']==adaptive.PIN:
@@ -50,7 +51,7 @@ def discover(roots,overrides=(),depth=3):
         if not sep or not dot or tool not in workspace.TOOLS or field not in workspace.TOOLS[tool][0].keys()|workspace.OPTIONAL.get(tool,set()) or not path:raise ValueError('Expected --set tool.field=PATH')
         if (tool,field) in explicit:raise ValueError('Repeated explicit field')
         p=Path(path).expanduser()
-        kind=workspace.TOOLS[tool][0].get(field,'executable' if field in ('python','runtime') else 'directory')
+        kind=workspace.TOOLS[tool][0].get(field,'executable' if field in ('python','runtime') else 'file' if field=='evidence_script' else 'directory')
         if not (p.is_dir() if kind=='directory' else p.is_file() and (kind!='executable' or os.access(p,os.X_OK))):raise ValueError('Invalid explicit path type: '+key)
         explicit[tool,field]=os.path.abspath(p) if field=='python' else str(p.resolve())
     config={};ambiguous=[]

@@ -49,7 +49,7 @@ ramgpt run output/model.gguf --spec runtime/spec.json --seed 931 --budgets 256 -
 ramgpt run MEASUREMENT_PLAN_ID --execute
 ```
 
-Replace GPU_UUID with the selected GPU UUID from `nvidia-smi -L`, and MEASUREMENT_PLAN_ID with the ID returned by preparation. Configure `llama-autotune.runtime` and `budgetfit.evaluator` first. The template capture loads the model but generates no completions; the measurement plan binds the task and smoke request caps. The strict literal smoke must pass before the workload runs.
+Replace GPU_UUID with the selected GPU UUID from `nvidia-smi -L`, and MEASUREMENT_PLAN_ID with the ID returned by preparation. Configure `llama-autotune.runtime` and `budgetfit.evaluator` first. The template capture loads the model but generates no completions; the measurement plan binds the task and smoke request caps. The runtime smoke must pass before the workload runs. Newly captured specs record literal instruction success separately from transport health; older frozen specs retain their original strict literal requirement.
 
 EXL3 with the official ExLlamaV3 converter:
 
@@ -94,3 +94,21 @@ The development branch has exercised real GGUF quantization and managed inferenc
 Single-GPU NVIDIA/Linux operation is the live-tested scope. Live standalone IFEval, broad EXL3 architecture coverage, cross-format optimization and automatic end-to-end quantization search remain outside this release. Passports are content-addressed summaries, not signed attestations or deployment certificates. Review [SECURITY.md](SECURITY.md) and [ROADMAP.md](ROADMAP.md) before using the toolchain.
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+
+## AutoOptimizer (v0.3.0 development)
+
+The development branch adds a minimal GGUF setup and an automatic bounded calibration/holdout workflow. The commands below are not in the v0.2.0 RC1 release.
+
+```bash
+ramgpt setup --profile gguf --runtime /path/to/llama-server --out native-setup --execute
+export RAMGPT_TOOLS_CONFIG="$PWD/native-setup/tools.json"
+ramgpt runtime-spec model.gguf --gpu-uuid GPU_UUID --out runtime --execute
+ramgpt auto-optimize model.gguf --spec runtime/spec.json --out search --vram 24GiB --budgets 256 1024 --kv f16 q8_0 --seed 941 --validation-seed 942 --max-requests 52 --max-completion-tokens 37120
+```
+
+Replace the model and GPU UUID with actual local values. Setup obtains the exact pinned BudgetFit archive from its public release, or accepts a matching local archive through --evaluator. It checks a trusted existing llama-server executable and its option support, reports missing NVML dependencies, and never installs a GPU driver or arbitrary runtime. No model is loaded by setup.
+
+Auto-optimize freezes both task manifests, reserves the maximum calibration and paired holdout request/token costs, uses f16 with the largest budget as its anchor, and writes a plan without generation. Repeat the same command with --execute to run it. Candidate selection reuses the native BudgetFit scorer, sampled GPU memory, and existing independent holdout workflow. Only a distinct challenger that passes the holdout receives selected-profile.json; every completed workflow exports model.passport.json. The profile holds local runtime arguments and request-budget settings, not a deployment certificate. The budget parameter is total completion tokens, not a native thinking-only limit. The VRAM constraint screens sampled observations; it is not a hard GPU allocator limit or an OOM guarantee. Changing parameters requires a new plan. Repeating a completed unchanged plan uses existing evidence, not new inference.
+
+The first real local pilot completed both KV configurations on a 0.6B GGUF (16 workload requests plus two smoke requests). Both achieved 12.5% joint accuracy and were rejected under the preselected 85% threshold; no holdout was run. The runtime returned 42. during each smoke, correctly recorded as failed literal instruction following but healthy transport. Separate synthetic-runtime tests cover successful selection, failed holdout, budget rejection and idempotence. No claim of general optimization gains is made.

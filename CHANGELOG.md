@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 (development)
+
+- Minimal verified GGUF dependency setup and executable option checks.
+- Versioned transport smoke diagnostics; legacy strict contracts unchanged.
+- Bounded AutoOptimizer orchestration for KV precision and generation budgets, with independent holdout and selected profile export.
+- Separate Q4Fit recipe-builder and evidence-script configuration.
+
+
 ## 0.2.0rc1
 
 Release candidate for the unified local model toolchain.
