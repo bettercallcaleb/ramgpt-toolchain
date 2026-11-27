@@ -3,6 +3,7 @@
 ## 0.3.0 (development)
 
 - Minimal verified GGUF dependency setup and executable option checks.
+- Commit-pinned native source supply bundle, archive integrity verification, offline installation and directory-based configuration.
 - Versioned transport smoke diagnostics; legacy strict contracts unchanged.
 - Bounded AutoOptimizer orchestration for KV precision and generation budgets, with independent holdout and selected profile export.
 - Separate Q4Fit recipe-builder and evidence-script configuration.

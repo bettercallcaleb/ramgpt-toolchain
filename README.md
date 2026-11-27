@@ -112,3 +112,23 @@ Replace the model and GPU UUID with actual local values. Setup obtains the exact
 Auto-optimize freezes both task manifests, reserves the maximum calibration and paired holdout request/token costs, uses f16 with the largest budget as its anchor, and writes a plan without generation. Repeat the same command with --execute to run it. Candidate selection reuses the native BudgetFit scorer, sampled GPU memory, and existing independent holdout workflow. Only a distinct challenger that passes the holdout receives selected-profile.json; every completed workflow exports model.passport.json. The profile holds local runtime arguments and request-budget settings, not a deployment certificate. The budget parameter is total completion tokens, not a native thinking-only limit. The VRAM constraint screens sampled observations; it is not a hard GPU allocator limit or an OOM guarantee. Changing parameters requires a new plan. Repeating a completed unchanged plan uses existing evidence, not new inference.
 
 The first real local pilot completed both KV configurations on a 0.6B GGUF (16 workload requests plus two smoke requests). Both achieved 12.5% joint accuracy and were rejected under the preselected 85% threshold; no holdout was run. The runtime returned 42. during each smoke, correctly recorded as failed literal instruction following but healthy transport. Separate synthetic-runtime tests cover successful selection, failed holdout, budget rejection and idempotence. No claim of general optimization gains is made.
+
+
+## Verified native supply bundle (v0.3.0 development)
+
+Install the compatible public tool sources and pinned evaluator together:
+
+```bash
+ramgpt supply --llama-root /path/to/llama.cpp --out native --execute
+export RAMGPT_TOOLS_CONFIG="$PWD/native"
+ramgpt tools
+ramgpt supply-verify native
+```
+
+The development command downloads five commit-pinned source archives (Q4Fit, QuantBench, llama-autotune, EXL3 First Mover and HereticBench) and the BudgetFit v0.6.0 evaluator used by both BudgetFit and TrustMeBro. Each download is bounded and verified against the catalog's SHA-256 before safe extraction. The bundle retains the archives, records extracted file hashes, and creates a relocatable configuration. When the configuration argument is a bundle directory, RAMGPT verifies the pinned archive and source bytes before loading the paths. This does not certify the behavior of native tools or install their Python dependencies. Use --runtime and --quantizer for separate llama.cpp build directories. An existing --tools-config file or bundle supplies external paths; catalog-provided fields use the pinned copies.
+
+For offline installation, place the five named repository tar.gz archives and budgetfit.pyz in a directory and pass --archive-dir; the same digests must match. Without --execute the command only lists the pinned catalog. The bundle is not a model downloader or a GPU driver installer.
+
+ConceptLadder v0.5 remains an external dependency: the public v0.4 source lacks the required measurement adapter. GGUF-Healer requires a compatible local script; EXL3 needs a separately installed backend and Python environment. Optional components are explicitly marked unconfigured rather than silently substituted. A public-only bundle with a suitable llama.cpp installation configures six adapters by path; supplying existing external paths can configure all nine. Configuration presence is not execution certification.
+
+Integration checks: online and offline bundle installation; exact historical Q4Fit and QuantBench replay; real Qwen3-0.6B floating-point GGUF conversion through the supplied public Q4Fit source, yielding the same Q4_K artifact SHA-256 as the prior verified build. No new GPU inference in this increment.

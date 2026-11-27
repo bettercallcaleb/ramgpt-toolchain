@@ -23,7 +23,12 @@ OPTIONAL={'q4fit':{'evidence_script'},'conceptladder':{'ifeval_root','deps','nlt
 
 def load(path):
     if path is None:return {}
-    p=Path(path).expanduser().resolve(strict=True);doc=read_json(p)
+    p=Path(path).expanduser().resolve(strict=True)
+    if p.is_dir():
+        import supply
+        supply.verify(p)
+        p=p/'tools.json'
+    doc=read_json(p)
     if not isinstance(doc,dict) or set(doc)!={'tools'} or not isinstance(doc['tools'],dict):raise ValueError('Expected tools configuration object')
     out={}
     for name,values in doc['tools'].items():

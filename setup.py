@@ -3,7 +3,7 @@ from setuptools import setup
 from setuptools.command.build_py import build_py
 
 ENGINE = (
-    "adaptive.py", "auto_optimizer.py", "install_native.py", "setup_tools.py", "frontdoor.py", "cross_format.py", "exl3_worker.py", "audit_parity.py", "autotune_worker.py", "doctor.py",
+    "adaptive.py", "auto_optimizer.py", "install_native.py", "supply.py", "setup_tools.py", "frontdoor.py", "cross_format.py", "exl3_worker.py", "audit_parity.py", "autotune_worker.py", "doctor.py",
     "evaluation.py", "evaluator_worker.py", "evidence.py", "inference.py",
     "joint.py", "ledger.py", "measurement_plan.py", "native_tools.py", "native_bridge.py", "optimize.py", "passport.py", "planner.py", "model_passport.py", "portfolio.py", "ramgpt.py",
     "registry.py", "release_info.py", "router_worker.py", "runtime.py",
