@@ -5,7 +5,7 @@ from setuptools.command.build_py import build_py
 ENGINE = (
     "adaptive.py", "audit_parity.py", "autotune_worker.py", "doctor.py",
     "evaluation.py", "evaluator_worker.py", "evidence.py", "inference.py",
-    "joint.py", "ledger.py", "optimize.py", "passport.py", "ramgpt.py",
+    "joint.py", "ledger.py", "optimize.py", "passport.py", "planner.py", "ramgpt.py",
     "registry.py", "release_info.py", "router_worker.py", "runtime.py",
     "runtime_opt.py", "telemetry.py", "weight.py",
 )

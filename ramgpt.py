@@ -40,6 +40,7 @@ def main():
     z=sub.add_parser('passport-export',aliases=['passport']);z.add_argument('artifact');z.add_argument('--out',required=True)
     z=sub.add_parser('passport-verify');z.add_argument('path');z.add_argument('--expected-id');z.add_argument('--model');z.add_argument('--local',action='store_true')
     z=sub.add_parser('doctor');z.add_argument('--evaluator');z.add_argument('--runtime');z.add_argument('--model');z.add_argument('--gpu',action='store_true')
+    z=sub.add_parser('optimize');z.add_argument('model');z.add_argument('--vram',required=True);z.add_argument('--objective',choices=['balanced','memory','latency','tokens'],default='balanced');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--min-tasks',type=int,default=8);z.add_argument('--headroom',default='1GiB');z.add_argument('--context',type=int);z.add_argument('--max-sample-gap',type=float,default=.25);z.add_argument('--fidelity-report');z.add_argument('--max-kl',type=float);z.add_argument('--out')
     args=p.parse_args()
     reg=None
     try:
@@ -79,11 +80,16 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
-                if args.action in ('passport-export','passport'):
+                if args.action=='optimize':
+                    import planner
+                    policy=planner.policy(args.vram,args.objective,args.min_accuracy,args.min_tasks,args.headroom,args.context,args.max_sample_gap,args.fidelity_report,args.max_kl)
+                    result=planner.build(reg,store,args.model,policy)
+                    if args.out:evaluation.write_new(args.out,result)
+                elif args.action in ('passport-export','passport'):
                     import passport
                     result=passport.export(reg,store,args.artifact,args.out)
                 elif args.action.startswith('joint-'):
