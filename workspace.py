@@ -15,7 +15,7 @@ TOOLS={
  'budgetfit':({'evaluator':'file'},['select','router-prepare']),
  'llama-autotune':({'autotune_source':'directory'},['runtime-prepare','runtime-compare']),
  'gguf-healer':({'native':'file','gguf_root':'directory'},['healer-compose','healer-import']),
- 'exl3-first-mover':({'native':'file','backend':'directory'},['exl3-preflight','exl3-build','exl3-import']),
+ 'exl3-first-mover':({'native':'file','backend':'directory'},['exl3-preflight','exl3-build','exl3-import','exl3-run','cross-compare']),
  'hereticbench':({'native':'directory'},['heretic-import'])
 }
 
@@ -50,14 +50,17 @@ def catalog(config):
 
 def apply(args,config):
     action=args.action
-    mapping={'build':'q4fit','healer-compose':'gguf-healer','healer-import':'gguf-healer','ladder-import':'conceptladder','exl3-build':'exl3-first-mover','exl3-preflight':'exl3-first-mover','exl3-import':'exl3-first-mover','heretic-import':'hereticbench','runtime-prepare':'llama-autotune','router-parity':'budgetfit','prepare':'budgetfit'}
+    mapping={'build':'q4fit','healer-compose':'gguf-healer','healer-import':'gguf-healer','ladder-import':'conceptladder','exl3-run':'exl3-first-mover','exl3-build':'exl3-first-mover','exl3-preflight':'exl3-first-mover','exl3-import':'exl3-first-mover','heretic-import':'hereticbench','runtime-prepare':'llama-autotune','router-parity':'budgetfit','prepare':'budgetfit'}
     tool=mapping.get(action)
     if action=='weight-import' and args.kind!='recipe':tool=args.kind
     if tool is None:return
-    keys={'build':('native','quantizer','gguf_root'),'healer-compose':('native','gguf_root'),'healer-import':('native','gguf_root'),'ladder-import':('native',),'exl3-build':('native','backend','python'),'exl3-preflight':('native','backend'),'exl3-import':('native',),'heretic-import':('native',),'weight-import':('native',),'runtime-prepare':('autotune_source',),'router-parity':('evaluator',),'prepare':('evaluator',)}[action]
+    keys={'build':('native','quantizer','gguf_root'),'healer-compose':('native','gguf_root'),'healer-import':('native','gguf_root'),'ladder-import':('native',),'exl3-run':('native','backend','python'),'exl3-build':('native','backend','python'),'exl3-preflight':('native','backend'),'exl3-import':('native',),'heretic-import':('native',),'weight-import':('native',),'runtime-prepare':('autotune_source',),'router-parity':('evaluator',),'prepare':('evaluator',)}[action]
     if action=='ladder-import' and getattr(args,'track','knowledge')=='ifeval':
         for k in ('ifeval_root','deps','nltk_data'):
             if getattr(args,k,None) is None:setattr(args,k,config.get(tool,{}).get(k))
+    if action=='exl3-run' and not args.evaluator:
+        args.evaluator=config.get('budgetfit',{}).get('evaluator')
+        if not args.evaluator:raise ValueError('Supply --evaluator or configure budgetfit.evaluator')
     for k in keys:
         if getattr(args,k,None) is None:setattr(args,k,config.get(tool,{}).get(k))
         if not getattr(args,k,None):raise ValueError('Supply --'+k.replace('_','-')+' or configure '+tool+'.'+k)
@@ -67,9 +70,11 @@ def model_info(reg,store,subject):
         aid=evidence.checked_id(subject[5:])
         rows=[r for r in native_bridge.find(store,'exl3-first-mover') if r['subject'].get('artifact_id')==aid]
         if not rows:raise ValueError('Unknown EXL3 artifact identity')
-        sizes={r['artifact_bytes'] for r in rows}
+        runs=[r for r in rows if r.get('kind')=='shared-native-evaluation']
+        rows=[r for r in rows if 'declared_bits' in r]
+        sizes={r['artifact_bytes'] for r in rows+runs}
         if len(sizes)!=1:raise ValueError('Conflicting EXL3 size')
-        return {'format':'exl3','artifact_id':aid,'bytes':sizes.pop(),'producer_reports':[{'report_id':r['report_id'],'repo_id':r['subject']['repo_id'],'source_revision':r['subject']['source_revision'],'declared_bits':r['declared_bits'],**({'local_source_id':r['local_source_id']} if 'local_source_id' in r else {})} for r in rows],'runtime_evidence':[],'scope':'EXL3 manifest identity; native runtime integration pending'}
+        return {'format':'exl3','artifact_id':aid,'bytes':sizes.pop(),'producer_reports':[{'report_id':r['report_id'],'repo_id':r['subject']['repo_id'],'source_revision':r['subject']['source_revision'],'declared_bits':r['declared_bits'],**({'local_source_id':r['local_source_id']} if 'local_source_id' in r else {})} for r in rows],'runtime_evidence':[{'report_id':r['report_id'],'requests':r['requests'],'context':r['context'],'gpu_name':r['gpu_name'],'profiles':[p['budgetfit'] for p in r['profiles']]} for r in runs],'scope':'EXL3 manifest identity and separate native runtime evidence; not a deployment recommendation'}
     aid=subject if re.fullmatch('[0-9a-f]{64}',subject) else fingerprint(subject,'model')['sha256']
     view=weight.artifact_view(store,aid)
     receipts=native_tools.find(store,aid)
@@ -109,5 +114,5 @@ def models(reg,store):
         if aid is None:continue
         item=rows.setdefault(('exl3',aid),{'format':'exl3','artifact_id':aid,'bytes':r['artifact_bytes'],'sources':set()})
         if item['bytes']!=r['artifact_bytes']:raise ValueError('Conflicting EXL3 artifact size')
-        item['sources'].add('exl3-first-mover')
+        item['sources'].add('exl3-native-evaluation' if r.get('kind')=='shared-native-evaluation' else 'exl3-first-mover')
     return {'models':[{**r,'sources':sorted(r['sources'])} for _,r in sorted(rows.items())],'scope':'Known local or historical model identities; not a claim that files are present, compatible or validated.'}

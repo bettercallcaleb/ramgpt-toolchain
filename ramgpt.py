@@ -52,6 +52,8 @@ def main():
     z=sub.add_parser('tool-find');z.add_argument('--artifact')
     z=sub.add_parser('exl3-preflight');z.add_argument('repo');z.add_argument('--native');z.add_argument('--backend');z.add_argument('--bits',type=float,default=4.0)
     z=sub.add_parser('exl3-build');z.add_argument('source');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid',required=True);z.add_argument('--bits',type=float,default=4.0);z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('exl3-run');z.add_argument('folder');z.add_argument('--dataset',required=True);z.add_argument('--evaluator');z.add_argument('--native');z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid',required=True);z.add_argument('--out',required=True);z.add_argument('--budgets',type=int,nargs='+',required=True);z.add_argument('--strategies',nargs='+',default=['allocated']);z.add_argument('--reserve',type=int,default=64);z.add_argument('--context',type=int,default=4096);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True);z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('cross-compare');z.add_argument('gguf_evaluation');z.add_argument('exl3_report')
     z=sub.add_parser('exl3-import');z.add_argument('folder');z.add_argument('manifest');z.add_argument('--native')
     z=sub.add_parser('heretic-import');z.add_argument('--native');z.add_argument('--dataset',required=True);z.add_argument('--base',required=True);z.add_argument('--variant',required=True);z.add_argument('--track',choices=['retention','epistemic'],required=True)
     z=sub.add_parser('tool-reports');z.add_argument('--tool',choices=['exl3-first-mover','hereticbench'])
@@ -103,7 +105,7 @@ def main():
         elif args.action=='router-parity':
             import adaptive
             result=adaptive.historical(args.evaluator,args.folder)
-        elif args.action in ('build','model-info','exl3-build','exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
+        elif args.action in ('build','model-info','exl3-run','cross-compare','exl3-build','exl3-preflight','exl3-import','heretic-import','tool-reports','healer-compose','healer-import','ladder-import','tool-find','workflow-select','workflow-finish','measurement-prepare','measurement-run','optimize','passport-export','passport','joint-select','joint-prepare','joint-validate','weight-import','weight-find','weight-view','weight-select','runtime-compare','router-prepare','archive-run','evidence-find','evidence-get','replay','select','validate-selection'):
             import evidence,evaluation
             store=evidence.Store(args.evidence_db)
             try:
@@ -115,6 +117,12 @@ def main():
                 elif args.action=='exl3-preflight':
                     import native_bridge
                     result=native_bridge.exl3_preflight(store,args.repo,args.native,args.backend,args.bits)
+                elif args.action=='exl3-run':
+                    import cross_format
+                    result=cross_format.run(store,args.folder,args.dataset,args.evaluator,args.native,args.backend,args.python,args.gpu_uuid,args.out,args.budgets,args.strategies,args.reserve,args.context,args.max_requests,args.max_completion_tokens,args.execute)
+                elif args.action=='cross-compare':
+                    import cross_format
+                    result=cross_format.compare(store,args.gguf_evaluation,args.exl3_report)
                 elif args.action=='exl3-build':
                     import native_bridge
                     result=native_bridge.exl3_build(store,args.source,args.out,args.native,args.backend,args.python,args.gpu_uuid,args.bits,args.execute)
