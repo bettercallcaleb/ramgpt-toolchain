@@ -1,16 +1,17 @@
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from registry import Registry,read_json
 from release_info import VERSION
 
 def main():
-    p=argparse.ArgumentParser(prog='ramgpt',description='RAMGPT Toolchain: local artifact registry and frozen experiment contracts')
+    p=argparse.ArgumentParser(prog='ramgpt',description='RAMGPT Toolchain: build, evaluate and optimize local models')
     p.add_argument('--version',action='version',version=VERSION)
     p.add_argument('--db',default='state/registry.sqlite')
     p.add_argument('--evidence-db',default='state/evidence.sqlite')
-    p.add_argument('--tools-config')
+    p.add_argument('--tools-config',default=os.environ.get('RAMGPT_TOOLS_CONFIG'))
     sub=p.add_subparsers(dest='action',required=True)
     r=sub.add_parser('register');r.add_argument('path');r.add_argument('--role',default='model')
     a=sub.add_parser('artifact');a.add_argument('sha256')
@@ -51,7 +52,7 @@ def main():
     z=sub.add_parser('ladder-import');z.add_argument('model');z.add_argument('raw');z.add_argument('--native');z.add_argument('--seed',type=int,default=211);z.add_argument('--variants',type=int,default=1);z.add_argument('--track',choices=['knowledge','ifeval'],default='knowledge');z.add_argument('--ifeval-root');z.add_argument('--limit',type=int);z.add_argument('--deps');z.add_argument('--nltk-data')
     z=sub.add_parser('tool-find');z.add_argument('--artifact')
     z=sub.add_parser('exl3-preflight');z.add_argument('repo');z.add_argument('--native');z.add_argument('--backend');z.add_argument('--bits',type=float,default=4.0)
-    z=sub.add_parser('exl3-build');z.add_argument('source');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid',required=True);z.add_argument('--bits',type=float,default=4.0);z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('exl3-build');z.add_argument('source');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid',required=True);z.add_argument('--bits',type=float,default=4.0);z.add_argument('--cal-rows',type=int);z.add_argument('--cal-cols',type=int);z.add_argument('--execute',action='store_true')
     z=sub.add_parser('exl3-run');z.add_argument('folder');z.add_argument('--dataset',required=True);z.add_argument('--evaluator');z.add_argument('--native');z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid',required=True);z.add_argument('--out',required=True);z.add_argument('--budgets',type=int,nargs='+',required=True);z.add_argument('--strategies',nargs='+',default=['allocated']);z.add_argument('--reserve',type=int,default=64);z.add_argument('--context',type=int,default=4096);z.add_argument('--max-requests',type=int,required=True);z.add_argument('--max-completion-tokens',type=int,required=True);z.add_argument('--execute',action='store_true')
     z=sub.add_parser('cross-compare');z.add_argument('gguf_evaluation');z.add_argument('exl3_report')
     z=sub.add_parser('exl3-import');z.add_argument('folder');z.add_argument('manifest');z.add_argument('--native')
@@ -59,13 +60,19 @@ def main():
     z=sub.add_parser('tool-reports');z.add_argument('--tool',choices=['exl3-first-mover','hereticbench'])
     z=sub.add_parser('recommend');z.add_argument('--candidate',action='append');z.add_argument('--vram',required=True);z.add_argument('--objective',choices=['balanced','memory','latency','tokens'],default='balanced');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--min-tasks',type=int,default=8);z.add_argument('--headroom',default='1GiB');z.add_argument('--context',type=int);z.add_argument('--max-sample-gap',type=float,default=.25);z.add_argument('--fidelity-report');z.add_argument('--max-kl',type=float);z.add_argument('--max-model-size');z.add_argument('--manifest');z.add_argument('--gpu-name');z.add_argument('--out')
     z=sub.add_parser('tool-sync');z.add_argument('source_evidence_db')
+    z=sub.add_parser('init');z.add_argument('--root',action='append',default=[]);z.add_argument('--set',action='append',default=[]);z.add_argument('--depth',type=int,default=3);z.add_argument('--out',default='tools.json')
     z=sub.add_parser('tools')
     z=sub.add_parser('model-info');z.add_argument('subject',nargs='?')
-    z=sub.add_parser('build');z.add_argument('model');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--quantizer');z.add_argument('--default');z.add_argument('--set',action='append',default=[]);z.add_argument('--threads',type=int);z.add_argument('--imatrix');z.add_argument('--format',choices=['gguf','exl3']);z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid');z.add_argument('--bits',type=float);z.add_argument('--execute',action='store_true')
+    z=sub.add_parser('build');z.add_argument('model');z.add_argument('--out',required=True);z.add_argument('--native');z.add_argument('--gguf-root');z.add_argument('--quantizer');z.add_argument('--default');z.add_argument('--set',action='append',default=[]);z.add_argument('--threads',type=int);z.add_argument('--imatrix');z.add_argument('--format',choices=['gguf','exl3']);z.add_argument('--backend');z.add_argument('--python');z.add_argument('--gpu-uuid');z.add_argument('--bits',type=float);z.add_argument('--cal-rows',type=int);z.add_argument('--cal-cols',type=int);z.add_argument('--execute',action='store_true')
     args=p.parse_args()
     reg=None
     try:
         import workspace
+        if args.action=='init':
+            import setup_tools
+            result=setup_tools.init(args.root,args.set,args.out,args.depth)
+            print(json.dumps(result,indent=2,ensure_ascii=False,allow_nan=False))
+            return 0
         cfg=workspace.load(args.tools_config)
         workspace.apply(args,cfg)
         if args.action=='tools':
@@ -138,7 +145,7 @@ def main():
                     result=cross_format.compare(store,args.gguf_evaluation,args.exl3_report)
                 elif args.action=='exl3-build':
                     import native_bridge
-                    result=native_bridge.exl3_build(store,args.source,args.out,args.native,args.backend,args.python,args.gpu_uuid,args.bits,args.execute)
+                    result=native_bridge.exl3_build(store,args.source,args.out,args.native,args.backend,args.python,args.gpu_uuid,args.bits,args.execute,args.cal_rows,args.cal_cols)
                 elif args.action=='exl3-import':
                     import native_bridge
                     result=native_bridge.exl3_import(store,args.folder,args.manifest,args.native)

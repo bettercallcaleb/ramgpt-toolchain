@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ramgpt-toolchain"
 version = "0.2.0.dev0"
-description = "Local evidence-first GGUF evaluation and optimization toolchain"
+description = "Unified local LLM model building, evaluation and optimization toolchain"
 readme = "README.md"
 license = {file = "LICENSE"}
 

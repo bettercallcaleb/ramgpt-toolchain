@@ -27,7 +27,7 @@ def native_summary(r):
     return out
 
 def exl_summary(r):
-    out=passport.fields(r,('report_id','scope','artifact_bytes','declared_bits','local_source_id','native_sha256','manifest_sha256','converter_sha256','backend_source_sha256','native_manifest_report_id'))
+    out=passport.fields(r,('report_id','scope','artifact_bytes','declared_bits','local_source_id','native_sha256','manifest_sha256','converter_sha256','backend_source_sha256','native_manifest_report_id','calibration_options'))
     out['kind']=r.get('kind','producer_manifest' if 'files' in r else 'producer_conversion')
     if r.get('kind')=='shared-native-evaluation':
         out.update(passport.fields(r,('manifest_sha256','schedule_sha256','evaluator_sha256','adapter_sha256','worker_sha256','context','sampling','reasoning_policy','native_cache_policy','gpu_name','gpu_driver','gpu_total_mib','requests','completion_cap')))

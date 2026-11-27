@@ -1,39 +1,50 @@
 # RAMGPT Toolchain
 
-**Measure first. Optimize second. Keep the evidence.**
+**Build. Evaluate. Optimize. Share the results.**
 
-An evidence-first evaluation and optimization toolchain for local LLMs and GGUF artifacts. RAMGPT connects model identity, native benchmarks, inference budgets, runtime measurements, constrained selection and independently validated decisions in one local CLI.
+RAMGPT brings nine local model-engineering tools into one CLI: Q4Fit, QuantBench, ConceptLadder, TrustMeBro, BudgetFit, llama-autotune, GGUF-Healer, EXL3 First Mover and HereticBench. The current development branch supports GGUF and EXL3 artifacts, native tool adapters, a common model catalog, constrained configuration selection and portable Model Passports.
 
-## What works today
+## Quick start (development branch)
 
-| Capability | v0.1.0 alpha |
-|---|---|
-| Exact artifact identity and frozen run contracts | Implemented |
-| Managed single-GPU llama-server inference and native task scoring | Implemented |
-| Content-addressed evidence, fixed-budget and adaptive-router analysis | Implemented |
-| Runtime candidate measurements and historical QuantBench/Q4Fit evidence | Implemented |
-| Constrained joint selection and paired pilot validation | Implemented for measured compatible configurations |
-| Portable Model Passport | Implemented |
-| Automatic end-to-end quantization search | Planned |
-
-## Quick start
-
-Requires Linux and Python 3.12+. Download the wheel from the release or build it from source as described below.
+Linux, Python 3.12+. From a checkout of this branch:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install ./ramgpt_toolchain-0.1.0-py3-none-any.whl
-.venv/bin/ramgpt doctor
-.venv/bin/ramgpt register /path/to/model.gguf
-.venv/bin/ramgpt passport ARTIFACT_SHA256 --out model.passport.json
-.venv/bin/ramgpt passport-verify model.passport.json --model /path/to/model.gguf
+source .venv/bin/activate
+python -m pip install '.[all]'
+ramgpt doctor --gpu
+ramgpt register /path/to/model.gguf
+ramgpt passport /path/to/model.gguf --out model.passport.json
+ramgpt passport-verify model.passport.json --model /path/to/model.gguf
 ```
 
-A newly registered model has identity but no benchmark results. The passport explicitly lists missing evidence. It does not claim that the model has been evaluated.
+A newly registered artifact has identity, not evaluation results. The passport lists missing evidence.
 
-The toolchain preserves distinct metrics instead of combining accuracy, fidelity, latency and memory into an arbitrary score. Historical experiments and failed holdouts remain visible. Original benchmarks and tools are authoritative for their scoring protocols.
+For native integrations, point RAMGPT at your existing trusted tool checkouts. It does not download or install them automatically.
 
-**Scope:** Research alpha, not a production deployment certificate or automatic best-model finder. Native integrations require separately supplied trusted tools and archives. No model weights, private evidence or native producer code are bundled. See [SECURITY.md](SECURITY.md) before executing native tools and [ROADMAP.md](ROADMAP.md) for limitations.
+```bash
+ramgpt init --root /path/to/local/tools --out tools.json
+export RAMGPT_TOOLS_CONFIG="$PWD/tools.json"
+ramgpt tools
+ramgpt model-info
+ramgpt recommend --vram 24GiB --min-accuracy 0.85
+```
+
+Review the discovered paths before exporting RAMGPT_TOOLS_CONFIG. Resolve duplicate candidates with --set tool.field=PATH and a new output file; see tools.example.json. Use explicit --tools-config to override the environment. Discovery checks paths, not native compatibility.
+
+## Main commands
+
+| Command | What it does |
+|---|---|
+| build | Quantize a floating-point GGUF using Q4Fit or a local source directory using ExLlamaV3 |
+| run | Execute a model-specific GGUF plan, frozen contract or imported Qwen3 EXL3 model |
+| recommend | Screen known, compatible observations against your limits |
+| passport | Export a portable model summary with separate evidence axes |
+| init / tools | Discover trusted local tool paths and inspect configuration |
+
+See **Four common commands** below for complete build and run examples. The GGUF backend needs a model-specific runtime spec, and the current EXL3 runner supports Qwen3 templates. The EXL3 adapter has been exercised on a real small model; EXL3 recommendation remains blocked until runtime provenance is frozen. No model or native producer code is bundled.
+
+The toolchain does not pool distinct metrics into an arbitrary overall score. Native scoring remains authoritative. This is a research alpha, not a deployment certificate. Read [SECURITY.md](SECURITY.md) before executing native tools and [ROADMAP.md](ROADMAP.md) for current scope.
 
 ## License
 
@@ -378,3 +389,12 @@ Run accepts a GGUF path plus its model-specific base spec (including the native 
 The passport alias now defaults to the consolidated v2 summary. The existing passport-export command retains its v1 GGUF output by default; --consolidated requests v2. V2 accepts a GGUF path/hash or EXL3 namespaced identity, and a registered EXL3 directory with the configured native manifest script. It preserves the existing GGUF passport where available and includes selected native producer/scoring summaries, explicitly missing axes, and the EXL3 directory manifest when applicable. Unbound historical paired reports are not attached to arbitrary model identities. Raw responses, local paths and device UUIDs are excluded. Passport-verify accepts both schemas and supports local snapshot verification and optional model byte verification. These are not signed certificates.
 
 Local checks: common GGUF run created a real native frozen plan with 8 workload requests plus 1 smoke request and a 2112-token completion cap, with zero inference. The consolidated passports for the existing repaired 27B, Q4 IFEval and Q2 managed runtime evidence exported successfully; the repaired and Q2 local snapshots verified. EXL3 dispatch and manifest verification were tested on fixtures; actual EXL3 GPU execution remains pending.
+
+
+## Real EXL3 engineering smoke and automatic setup
+
+The local Qwen3-0.6B source was converted by the official ExLlamaV3 converter through the common build entry point. The 4 bpw target uses native default head/embedding precision. For this engineering pilot only, explicit --cal-rows 16 --cal-cols 512 were used instead of the normal native calibration defaults; these options are recorded in the conversion report and consolidated passport. The converter completed in about 63 seconds including adapter checks, produced a 666,003,210-byte directory, and returned the GPU to baseline. The same artifact then completed eight existing native tasks at budget 256, with 0.385 s mean request latency, 25% joint accuracy and 25% truncation. The poor score is retained; this is not a representative EXL3 quality benchmark. No extra model download or repeated calibration was performed.
+
+The EXL3 passport verified both the local evidence snapshot and every artifact file. The execution required an already working backend Python environment and a process-level system libstdc++ preload on the test host. No global Python dependencies were modified. Runtime mapped-library provenance and independent validation are still missing, so this pilot remains excluded from resource-constrained recommendations.
+
+Discovery is bounded to explicitly supplied roots, with a default depth of three (maximum five), a directory-count limit and no symlink traversal. It recognizes known tool layouts, checks the pinned BudgetFit archive, skips generated Q4Fit build copies, and reports ambiguous paths instead of silently picking one. It never executes discovered native code, changes global dependencies, overwrites a configuration or downloads anything. On the integration host all nine tool paths were resolved using discovery and explicit overrides for the standalone ConceptLadder checkout and preferred quantizer.

@@ -26,8 +26,9 @@ def build(reg,store,args,config):
         if args.gguf_root or args.quantizer or args.default is not None or args.set or args.imatrix or args.threads is not None:raise ValueError('GGUF quantizer options are not EXL3 options')
         configure(args,config,'exl3-first-mover',('native','backend','python'))
         if not args.gpu_uuid:raise ValueError('EXL3 build requires --gpu-uuid')
-        return native_bridge.exl3_build(store,args.model,args.out,args.native,args.backend,args.python,args.gpu_uuid,args.bits if args.bits is not None else 4.0,args.execute)
-    if any(x is not None for x in (args.backend,args.python,args.gpu_uuid,args.bits)):raise ValueError('EXL3 options are not GGUF quantizer options')
+        calibration={k:getattr(args,k) for k in ('cal_rows','cal_cols') if getattr(args,k,None) is not None}
+        return native_bridge.exl3_build(store,args.model,args.out,args.native,args.backend,args.python,args.gpu_uuid,args.bits if args.bits is not None else 4.0,args.execute,**calibration)
+    if any(x is not None for x in (args.backend,args.python,args.gpu_uuid,args.bits,getattr(args,"cal_rows",None),getattr(args,"cal_cols",None))):raise ValueError('EXL3 options are not GGUF quantizer options')
     configure(args,config,'q4fit',('native','quantizer','gguf_root'))
     return native_tools.q4fit_build(reg,store,args.model,args.out,args.native,args.gguf_root,args.quantizer,args.default or 'Q4_K',args.set,args.threads if args.threads is not None else 12,args.imatrix,args.execute)
 

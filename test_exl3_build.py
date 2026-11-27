@@ -25,6 +25,7 @@ class Exl3BuildTests(unittest.TestCase):
 from pathlib import Path
 p=argparse.ArgumentParser()
 for name,short in [('in_dir','i'),('out_dir','o'),('work_dir','w'),('bits','b'),('devices','d')]:p.add_argument('-'+short,'--'+name,required=True)
+p.add_argument('--cal_rows',type=int);p.add_argument('--cal_cols',type=int)
 a=p.parse_args()
 out=Path(a.out_dir)
 (out/'config.json').write_text(json.dumps({'quantization_config':{'quant_method':'exl3'}}))
@@ -32,11 +33,17 @@ out=Path(a.out_dir)
 ''')
     def tearDown(self):
         self.s.close();self.tmp.cleanup()
-    def build(self,execute=True):
-        return b.exl3_build(self.s,self.source,self.root/'result',self.native,self.backend,sys.executable,GPU,4.,execute)
+    def build(self,execute=True,**kwargs):
+        return b.exl3_build(self.s,self.source,self.root/'result',self.native,self.backend,sys.executable,GPU,4.,execute,**kwargs)
     def test_no_execution_without_flag(self):
         with self.assertRaisesRegex(ValueError,'Explicit --execute'):self.build(False)
         self.assertFalse((self.root/'result').exists())
+    def test_calibration_dimensions(self):
+        with self.assertRaisesRegex(ValueError,'Invalid native calibration'):self.build(cal_rows=1)
+        with patch('runtime.lease',return_value=contextlib.nullcontext()),patch('runtime.gpu_state',return_value={GPU:{'used_mib':16}}),patch('runtime.compute_apps',return_value=[]),patch('shutil.disk_usage') as disk:
+            disk.return_value.free=40*2**30
+            r=self.build(cal_rows=16,cal_cols=512)
+        self.assertEqual(r['calibration_options'],{'rows':16,'cols':512})
     def test_official_entrypoint_handoff_fixture(self):
         with patch('runtime.lease',return_value=contextlib.nullcontext()),patch('runtime.gpu_state',return_value={GPU:{'used_mib':16}}),patch('runtime.compute_apps',return_value=[]),patch('shutil.disk_usage') as disk:
             disk.return_value.free=40*2**30

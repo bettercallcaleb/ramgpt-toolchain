@@ -133,13 +133,15 @@ h['CFG']['exllamav3_repo']=sys.argv[2]
 print(json.dumps(h['architecture_supported'](sys.argv[3])))
 """
 
-def exl3_build(store,source,out,native,backend,python,gpu_uuid,bits,execute=False):
+def exl3_build(store,source,out,native,backend,python,gpu_uuid,bits,execute=False,cal_rows=None,cal_cols=None):
     import os
     import shutil
     import subprocess
     import runtime
     if execute is not True:raise ValueError('Explicit --execute required for EXL3 conversion')
     if not math.isfinite(bits) or not 2<=bits<=8:raise ValueError('Invalid target bitrate')
+    for value,low,high in ((cal_rows,8,2048),(cal_cols,256,8192)):
+        if value is not None and (type(value) is not int or not low<=value<=high):raise ValueError('Invalid native calibration dimensions')
     if not runtime.UUID.fullmatch(gpu_uuid):raise ValueError('Select one GPU UUID')
     source=Path(source).resolve(strict=True);out=Path(out).resolve();native=Path(native).resolve(strict=True);backend=Path(backend).resolve(strict=True)
     python=Path(os.path.abspath(os.path.expanduser(python)))
@@ -169,6 +171,8 @@ def exl3_build(store,source,out,native,backend,python,gpu_uuid,bits,execute=Fals
         if not state or runtime.compute_apps(gpu_uuid) or state['used_mib']>512:raise ValueError('Selected GPU is occupied or unavailable')
         with (out/'convert.log').open('x') as log:
             cmd=[str(python),'-E',str(converter),'-i',str(source),'-o',str(artifact),'-w',str(work),'-b',str(bits),'-d','0']
+            if cal_rows is not None:cmd+=['--cal_rows',str(cal_rows)]
+            if cal_cols is not None:cmd+=['--cal_cols',str(cal_cols)]
             proc=subprocess.Popen(cmd,cwd=backend,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
             try:
                 if proc.wait()!=0:raise ValueError('Official converter failed; see convert.log')
@@ -181,4 +185,4 @@ def exl3_build(store,source,out,native,backend,python,gpu_uuid,bits,execute=Fals
     manifest={'repo_id':None,'source_revision':None,'bits':bits,'files':files,'local_source_id':digest(before)}
     write_new(out/'manifest.json',manifest)
     imported=exl3_import(store,artifact,out/'manifest.json',native)
-    return save(store,'exl3-first-mover',{'format':'exl3','artifact_id':imported['subject']['artifact_id'],'repo_id':None,'source_revision':None},{'artifact_bytes':imported['artifact_bytes'],'declared_bits':bits,'local_source_id':digest(before),'native_manifest_report_id':imported['report_id'],'converter_sha256':converter_ref['sha256'],'backend_source_sha256':backend_ref,'scope':'Official ExLlamaV3 local conversion completed; output manifest verified, no generation or runtime quality validation.'})
+    return save(store,'exl3-first-mover',{'format':'exl3','artifact_id':imported['subject']['artifact_id'],'repo_id':None,'source_revision':None},{'artifact_bytes':imported['artifact_bytes'],'declared_bits':bits,'local_source_id':digest(before),'calibration_options':{'rows':cal_rows,'cols':cal_cols},'native_manifest_report_id':imported['report_id'],'converter_sha256':converter_ref['sha256'],'backend_source_sha256':backend_ref,'scope':'Official ExLlamaV3 local conversion completed; output manifest verified, no generation or runtime quality validation.'})
