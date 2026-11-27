@@ -11,7 +11,7 @@ def discover(roots,overrides=(),depth=3):
     def add(tool,key,path):
         p=Path(path)
         if not p.exists():return
-        kind=workspace.TOOLS[tool][0].get(key,'directory' if key!='python' else 'executable')
+        kind=workspace.TOOLS[tool][0].get(key,'executable' if key in ('python','runtime') else 'directory')
         if not (p.is_dir() if kind=='directory' else p.is_file() and (kind!='executable' or os.access(p,os.X_OK))):return
         value=os.path.abspath(p) if key=='python' else str(p.resolve())
         candidates.setdefault((tool,key),set()).add(value)
@@ -42,6 +42,7 @@ def discover(roots,overrides=(),depth=3):
             if (p/'gguf-py'/'gguf').is_dir():
                 for tool in ('q4fit','gguf-healer'):add(tool,'gguf_root',p/'gguf-py')
             if 'llama-quantize' in files:add('q4fit','quantizer',p/'llama-quantize')
+            if 'llama-server' in files:add('llama-autotune','runtime',p/'llama-server')
     explicit={}
     for value in overrides:
         key,sep,path=value.partition('=')
@@ -49,7 +50,7 @@ def discover(roots,overrides=(),depth=3):
         if not sep or not dot or tool not in workspace.TOOLS or field not in workspace.TOOLS[tool][0].keys()|workspace.OPTIONAL.get(tool,set()) or not path:raise ValueError('Expected --set tool.field=PATH')
         if (tool,field) in explicit:raise ValueError('Repeated explicit field')
         p=Path(path).expanduser()
-        kind=workspace.TOOLS[tool][0].get(field,'executable' if field=='python' else 'directory')
+        kind=workspace.TOOLS[tool][0].get(field,'executable' if field in ('python','runtime') else 'directory')
         if not (p.is_dir() if kind=='directory' else p.is_file() and (kind!='executable' or os.access(p,os.X_OK))):raise ValueError('Invalid explicit path type: '+key)
         explicit[tool,field]=os.path.abspath(p) if field=='python' else str(p.resolve())
     config={};ambiguous=[]

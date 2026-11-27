@@ -60,6 +60,7 @@ def main():
     z=sub.add_parser('tool-reports');z.add_argument('--tool',choices=['exl3-first-mover','hereticbench'])
     z=sub.add_parser('recommend');z.add_argument('--candidate',action='append');z.add_argument('--vram',required=True);z.add_argument('--objective',choices=['balanced','memory','latency','tokens'],default='balanced');z.add_argument('--min-accuracy',type=float,default=.85);z.add_argument('--min-tasks',type=int,default=8);z.add_argument('--headroom',default='1GiB');z.add_argument('--context',type=int);z.add_argument('--max-sample-gap',type=float,default=.25);z.add_argument('--fidelity-report');z.add_argument('--max-kl',type=float);z.add_argument('--max-model-size');z.add_argument('--manifest');z.add_argument('--gpu-name');z.add_argument('--out')
     z=sub.add_parser('tool-sync');z.add_argument('source_evidence_db')
+    z=sub.add_parser('runtime-spec');z.add_argument('model');z.add_argument('--runtime');z.add_argument('--evaluator');z.add_argument('--gpu-uuid',required=True);z.add_argument('--out',required=True);z.add_argument('--port',type=int,default=18429);z.add_argument('--context',type=int,default=4096);z.add_argument('--threads',type=int,default=8);z.add_argument('--gpu-layers',type=int,default=999);z.add_argument('--execute',action='store_true')
     z=sub.add_parser('init');z.add_argument('--root',action='append',default=[]);z.add_argument('--set',action='append',default=[]);z.add_argument('--depth',type=int,default=3);z.add_argument('--out',default='tools.json')
     z=sub.add_parser('tools')
     z=sub.add_parser('model-info');z.add_argument('subject',nargs='?')
@@ -75,6 +76,14 @@ def main():
             return 0
         cfg=workspace.load(args.tools_config)
         workspace.apply(args,cfg)
+        if args.action=='runtime-spec':
+            import runtime_spec
+            binary=args.runtime or cfg.get('llama-autotune',{}).get('runtime')
+            archive=args.evaluator or cfg.get('budgetfit',{}).get('evaluator')
+            if not binary or not archive:raise ValueError('Supply --runtime and --evaluator or configure native paths')
+            result=runtime_spec.capture(args.model,binary,archive,args.gpu_uuid,args.out,args.port,args.context,args.threads,args.gpu_layers,args.execute)
+            print(json.dumps(result,indent=2,ensure_ascii=False,allow_nan=False))
+            return 0
         if args.action=='tools':
             print(json.dumps(workspace.catalog(cfg),indent=2,ensure_ascii=False,allow_nan=False))
             return 0

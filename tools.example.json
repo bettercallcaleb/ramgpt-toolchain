@@ -21,7 +21,8 @@
       "evaluator": "/path/to/budgetfit.pyz"
     },
     "llama-autotune": {
-      "autotune_source": "/path/to/llama-autotune"
+      "autotune_source": "/path/to/llama-autotune",
+      "runtime": "/path/to/llama.cpp/build/bin/llama-server"
     },
     "gguf-healer": {
       "native": "/path/to/gguf-healer/healer.py",

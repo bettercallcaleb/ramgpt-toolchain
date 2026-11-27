@@ -19,7 +19,7 @@ TOOLS={
  'hereticbench':({'native':'directory'},['heretic-import'])
 }
 
-OPTIONAL={'conceptladder':{'ifeval_root','deps','nltk_data'},'exl3-first-mover':{'python'}}
+OPTIONAL={'conceptladder':{'ifeval_root','deps','nltk_data'},'exl3-first-mover':{'python'},'llama-autotune':{'runtime'}}
 
 def load(path):
     if path is None:return {}

@@ -61,6 +61,8 @@ def run(reg,store,args,config):
     if any(getattr(args,k,None) is not None for k in ('dataset','gpu_uuid','native','backend','python','evaluator','context')):raise ValueError('GGUF run uses model-specific --spec for runtime, GPU, context and template')
     if not args.spec or args.seed is None:raise ValueError('GGUF model run requires --spec and --seed')
     spec=read_json(args.spec)
+    import runtime_spec
+    runtime_spec.check_binding(spec)
     models=[Path(x['path']).expanduser().resolve(strict=True) for x in spec['inputs'] if x['role']=='model']
     if models!=[Path(value).expanduser().resolve(strict=True)]:raise ValueError('Base spec model path does not match requested model')
     plan=measurement_plan.prepare(reg,store,args.spec,args.out,args.seed,args.variants if args.variants is not None else 1,args.budgets,strategies,reserve,args.kv or ['f16'],args.max_requests,args.max_completion_tokens)

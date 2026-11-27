@@ -41,8 +41,9 @@ Review the discovered paths before exporting RAMGPT_TOOLS_CONFIG. Resolve duplic
 | recommend | Screen known, compatible observations against your limits |
 | passport | Export a portable model summary with separate evidence axes |
 | init / tools | Discover trusted local tool paths and inspect configuration |
+| runtime-spec | Capture a model-specific GGUF runtime specification |
 
-See **Four common commands** below for complete build and run examples. The GGUF backend needs a model-specific runtime spec, and the current EXL3 runner supports Qwen3 templates. The EXL3 adapter has been exercised on a real small model; EXL3 recommendation remains blocked until runtime provenance is frozen. No model or native producer code is bundled.
+See **Four common commands** below for complete build and run examples. The GGUF backend can generate its model-specific runtime spec using runtime-spec, and the current EXL3 runner supports Qwen3 templates. The EXL3 adapter has been exercised on a real small model; EXL3 recommendation remains blocked until runtime provenance is frozen. No model or native producer code is bundled.
 
 The toolchain does not pool distinct metrics into an arbitrary overall score. Native scoring remains authoritative. This is a research alpha, not a deployment certificate. Read [SECURITY.md](SECURITY.md) before executing native tools and [ROADMAP.md](ROADMAP.md) for current scope.
 
@@ -398,3 +399,16 @@ The local Qwen3-0.6B source was converted by the official ExLlamaV3 converter th
 The EXL3 passport verified both the local evidence snapshot and every artifact file. The execution required an already working backend Python environment and a process-level system libstdc++ preload on the test host. No global Python dependencies were modified. Runtime mapped-library provenance and independent validation are still missing, so this pilot remains excluded from resource-constrained recommendations.
 
 Discovery is bounded to explicitly supplied roots, with a default depth of three (maximum five), a directory-count limit and no symlink traversal. It recognizes known tool layouts, checks the pinned BudgetFit archive, skips generated Q4Fit build copies, and reports ambiguous paths instead of silently picking one. It never executes discovered native code, changes global dependencies, overwrites a configuration or downloads anything. On the integration host all nine tool paths were resolved using discovery and explicit overrides for the standalone ConceptLadder checkout and preferred quantizer.
+
+
+## Generate a GGUF runtime spec
+
+Configure llama-autotune.runtime with your trusted llama-server executable and budgetfit.evaluator with the pinned native archive, or pass --runtime and --evaluator explicitly.
+
+    ramgpt runtime-spec model.gguf --gpu-uuid GPU_UUID --out runtime --execute
+    ramgpt run model.gguf --spec runtime/spec.json --seed 931 --budgets 256 --out measurement --max-requests 9 --max-completion-tokens 2112
+    ramgpt run MEASUREMENT_PLAN_ID --execute
+
+Runtime-spec explicitly loads the model on the selected idle GPU, checks loopback listener ownership, captures the native apply-template response and stops the server. It issues no completion requests. The generated specification uses explicit single-GPU, non-thinking, greedy defaults (4096 context, eight CPU threads, full GPU offload, f16 KV); configure context, threads, GPU layers and port if needed. It records the input fingerprints and the common run command checks that they still match before preparation. It does not certify the model's literal smoke or evaluation behavior. Existing hand-written specs remain supported.
+
+Fresh-install check: a new Python virtual environment installed the development wheel offline without optional dependencies, registered an existing Qwen3-0.6B GGUF, prepared a bounded 8-task plus 1-smoke plan from the real captured template, correctly returned no eligible recommendation without evidence, and exported and verified a consolidated passport against both the local snapshot and actual model bytes. No completion requests were made. A GPU execution environment still needs the optional GPU dependency and native runtime.
