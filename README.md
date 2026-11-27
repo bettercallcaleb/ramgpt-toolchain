@@ -173,3 +173,21 @@ The source lock preserves the repository, immutable commit and expected artifact
 The metadata resolver was exercised on the public Qwen3-0.6B GGUF catalog (preview only). The full lock/download/reuse workflow was verified with the 1.19 MB ggml-org/tiny-llamas test artifact, which is not a recommended chat model.
 
 Actual integration check: tune automatically captured the template and executed 16 workload requests plus two transport checks for the existing Qwen3-0.6B GGUF, with no eligible configuration at the fixed accuracy floor; no holdout was executed. Both local 429 MB import and a real 1.19 MB public Hugging Face download were verified, and repeat imports transferred zero new bytes. The GPU returned to baseline. Positive holdout behavior remains covered by the existing synthetic-runtime tests, not a new real positive-control result.
+
+
+## Install the official llama.cpp runtime without compiling (v0.3.0 development)
+
+For Linux x86_64 with glibc 2.39 or newer, a compatible NVIDIA driver and system CUDA 12 shared libraries:
+
+```bash
+ramgpt supply --runtime-pack cuda12.8 --out native
+ramgpt supply --runtime-pack cuda12.8 --out native --execute
+export RAMGPT_TOOLS_CONFIG="$PWD/native"
+ramgpt tune model.gguf --vram 24GiB --execute
+```
+
+The first command previews the pinned package. The second installs the upstream llama.cpp b12810 prerelease CUDA 12.8 x86_64 binary archive and extracts the GGUF Python library from the same commit. These two archives total 267,149,553 bytes (about 255 MiB), in addition to the original native tool source packages and evaluator. The package locks the GitHub release asset SHA-256 and the observed commit-source archive SHA-256, verifies sizes, safely handles same-directory shared-library aliases and checks executable permissions. It validates llama-server options and resolves shared-library dependencies before publishing the installation. It retains the original archives for offline integrity verification; passing the bundle directory as the configuration rechecks the pinned installed files. Python bytecode caches are excluded from the source manifests. This verifies content, not a signed upstream attestation.
+
+The official binary pack does not install the CUDA toolkit, NVIDIA driver or Python extras; system CUDA 12 shared libraries remain required. Missing libraries cause setup to fail instead of silently choosing CPU. Install the package GPU extra and NumPy separately where needed. Use the external llama.cpp path workflow on other supported runtime configurations. The pinned archive is an upstream prerelease, not a claim of stable cross-platform support. For offline installation, add llama-source.tar.gz and the named upstream binary archive to the original --archive-dir along with the five native archives and budgetfit.pyz.
+
+Verified on Ubuntu 24.04 x86_64 with RTX 4090 and existing CUDA 12 libraries: official binary and same-commit Python source obtained and hashed; offline combined bundle installation, native template capture, 16 workload requests and two transport checks completed. No candidate passed the 85% accuracy floor in the small-model engineering pilot, so holdout and selected profile were not produced. The GPU returned to baseline. The public-only bundle still does not supply ConceptLadder v0.5, GGUF-Healer or the ExLlamaV3 backend.

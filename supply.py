@@ -76,11 +76,15 @@ def files(root):
 def plan():
     return {'schema':SCHEMA,'packages':{name:{'repository':'bettercallcaleb/'+repo,'revision':rev,'archive_sha256':h,'url':f'https://codeload.github.com/bettercallcaleb/{repo}/tar.gz/{rev}'} for name,(repo,rev,h,_) in PACKS.items()},'evaluator':{'url':install_native.URL,'sha256':adaptive.PIN},'external_requirements':['llama.cpp executable and GGUF Python source','ConceptLadder v0.5 source (public v0.4 incompatible)','GGUF-Healer local script','ExLlamaV3 backend and Python environment'],'scope':'Pinned archives, not automatic installation of Python/GPU dependencies or model weights.'}
 
-def install(out,base_config=None,llama_root=None,archive_dir=None,evaluator=None,execute=False,runtime=None,quantizer=None):
+def install(out,base_config=None,llama_root=None,archive_dir=None,evaluator=None,execute=False,runtime=None,quantizer=None,runtime_pack=None):
     root=Path(out).expanduser().resolve()
     if root.exists():raise ValueError('Require fresh supply directory')
     body=plan()
-    if not execute:return {'status':'supply_planned','out':str(root),**body}
+    if runtime_pack:
+        import runtime_supply
+        if runtime_pack!=runtime_supply.PROFILE or any((llama_root,runtime,quantizer)):raise ValueError('Use runtime pack or external llama.cpp paths, not both')
+    if not execute:return {'status':'supply_planned','out':str(root),**body,**({'runtime_pack':runtime_supply.plan()} if runtime_pack else {})}
+    if runtime_pack:runtime_supply.host_check()
     config=workspace.load(base_config)
     root.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.ramgpt-supply-',dir=root.parent) as tmp:
@@ -113,8 +117,15 @@ def install(out,base_config=None,llama_root=None,archive_dir=None,evaluator=None
                 p=Path(value).expanduser().resolve(strict=True)
                 if not p.is_file() or not os.access(p,os.X_OK):raise ValueError('Expected executable: '+str(p))
                 config.setdefault(tool,{})[key]=str(p)
+        runtime_lock=None
+        if runtime_pack:
+            r=runtime_supply.install(stage/'runtime',archive_dir,True)
+            runtime_lock=r['lock_id']
+            for tool,key,field in [('llama-autotune','runtime','runtime'),('q4fit','quantizer','quantizer'),('q4fit','gguf_root','gguf_root'),('gguf-healer','gguf_root','gguf_root')]:
+                config.setdefault(tool,{})[key]='runtime/'+runtime_supply.PATHS[field]
         evaluation.write_new(stage/'tools.json',{'tools':config})
         lock={**body,'receipts':receipts,'config_sha256':sha(stage/'tools.json')}
+        if runtime_lock:lock['runtime_lock_id']=runtime_lock
         evaluation.write_new(stage/'supply-lock.json',{'lock_id':digest(lock),**lock})
         if root.exists():raise ValueError('Supply output already exists')
         stage.rename(root)
@@ -140,4 +151,13 @@ def verify(root):
             if cfg.get(name,{}).get(field)!=str((root/'sources'/name/rel).resolve()):raise ValueError('Supply config points outside pinned source: '+name+'.'+field)
     for name in ('budgetfit','trustmebro'):
         if cfg.get(name,{}).get('evaluator')!=str(root/'budgetfit.pyz'):raise ValueError('Supply evaluator path mismatch')
-    return {'status':'supply_verified','lock_id':lock['lock_id'],'config':str(root/'tools.json'),'packages':len(PACKS),'evaluator_verified':True,'tools':workspace.catalog(cfg)['tools'],'external_requirements':body['external_requirements'],'new_inference_requests':0,'scope':'Archive and extracted source integrity verified against pinned catalog; external dependencies not certified.'}
+    runtime_report=None
+    if 'runtime_lock_id' in body:
+        import runtime_supply
+        if (root/'runtime').is_symlink():raise ValueError('Unsafe embedded runtime path')
+        runtime_report=runtime_supply.verify(root/'runtime')
+        if runtime_report['lock_id']!=body['runtime_lock_id']:raise ValueError('Embedded runtime lock mismatch')
+        for tool,key,field in [('llama-autotune','runtime','runtime'),('q4fit','quantizer','quantizer'),('q4fit','gguf_root','gguf_root'),('gguf-healer','gguf_root','gguf_root')]:
+            if cfg.get(tool,{}).get(key)!=runtime_report['paths'][field]:raise ValueError('Embedded runtime configuration mismatch')
+    external=body['external_requirements'] if not runtime_report else body['external_requirements'][1:]+runtime_report['requirements']
+    return {'status':'supply_verified','lock_id':lock['lock_id'],'config':str(root/'tools.json'),'packages':len(PACKS),'evaluator_verified':True,'runtime_pack':runtime_report,'tools':workspace.catalog(cfg)['tools'],'external_requirements':external,'new_inference_requests':0,'scope':'Archive and extracted source integrity verified against pinned catalog; external dependencies not certified.'}
