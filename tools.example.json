@@ -1,0 +1,40 @@
+{
+  "tools": {
+    "q4fit": {
+      "native": "/path/to/q4fit/q4fit.py",
+      "quantizer": "/path/to/llama.cpp/build/bin/llama-quantize",
+      "gguf_root": "/path/to/llama.cpp/gguf-py"
+    },
+    "quantbench": {
+      "native": "/path/to/quantbench/run-artifact-comparison.py"
+    },
+    "conceptladder": {
+      "native": "/path/to/conceptladder-checkout",
+      "ifeval_root": "/path/to/google-research",
+      "deps": "/path/to/optional-ifeval-dependencies",
+      "nltk_data": "/path/to/nltk_data"
+    },
+    "trustmebro": {
+      "evaluator": "/path/to/budgetfit.pyz"
+    },
+    "budgetfit": {
+      "evaluator": "/path/to/budgetfit.pyz"
+    },
+    "llama-autotune": {
+      "autotune_source": "/path/to/llama-autotune",
+      "runtime": "/path/to/llama.cpp/build/bin/llama-server"
+    },
+    "gguf-healer": {
+      "native": "/path/to/gguf-healer/healer.py",
+      "gguf_root": "/path/to/llama.cpp/gguf-py"
+    },
+    "exl3-first-mover": {
+      "native": "/path/to/exl3-first-mover/fm.py",
+      "backend": "/path/to/exllamav3",
+      "python": "/path/to/exllamav3-venv/bin/python"
+    },
+    "hereticbench": {
+      "native": "/path/to/HereticBench"
+    }
+  }
+}
