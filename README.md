@@ -6,7 +6,7 @@ A unified CLI for local LLM engineering. Connect existing model tools, run nativ
 
 ## Install
 
-Linux and Python 3.12 or newer. Install from the release-candidate branch checkout:
+Linux and Python 3.12 or newer. Download the wheel from [GitHub Releases](https://github.com/bettercallcaleb/ramgpt-toolchain/releases), or install from the source checkout:
 
 ```bash
 python3 -m venv .venv
@@ -73,15 +73,17 @@ Recommendations screen compatible existing observations, not arbitrary untested 
 
 | Tool | Current integration |
 |---|---|
-| Q4Fit | Native GGUF quantization, recipe and depth evidence |
-| QuantBench | Native historical fidelity replay and selection |
-| ConceptLadder | Historical native knowledge and IFEval regrading |
-| TrustMeBro | Native task scoring through the pinned BudgetFit archive |
-| BudgetFit | Fixed budget scoring and adaptive router selection/validation |
-| llama-autotune | Native runtime candidate planning and comparison |
+| [Q4Fit](https://github.com/bettercallcaleb/q4fit) | Native GGUF quantization, recipe and depth evidence |
+| [QuantBench](https://github.com/bettercallcaleb/ramgpt-quantbench) | Native historical fidelity replay and selection |
+| [ConceptLadder](https://github.com/bettercallcaleb/conceptladder-bench) | Historical native knowledge and IFEval regrading |
+| [TrustMeBro](https://github.com/bettercallcaleb/trustmebro) | Native task scoring through the pinned BudgetFit archive |
+| [BudgetFit](https://github.com/bettercallcaleb/budgetfit) | Fixed budget scoring and adaptive router selection/validation |
+| [llama-autotune](https://github.com/bettercallcaleb/llama-autotune) | Native runtime candidate planning and comparison |
 | GGUF-Healer | Native tensor composition and payload verification |
-| EXL3 First Mover | Metadata preflight, manifest, official backend conversion and Qwen3 generation |
-| HereticBench | Paired historical retention, instruction and epistemic regrading |
+| [EXL3 First Mover](https://github.com/bettercallcaleb/exl3-first-mover) | Metadata preflight, manifest, official backend conversion and Qwen3 generation |
+| [HereticBench](https://github.com/bettercallcaleb/HereticBench) | Paired historical retention, instruction and epistemic regrading |
+
+Use the [BudgetFit v0.6.0 release](https://github.com/bettercallcaleb/budgetfit/releases/tag/v0.6.0) for the pinned evaluator archive. The GGUF-Healer adapter requires an existing compatible local producer script; no standalone public Healer download is included in this release.
 
 All nine have adapters; they are not all independent live execution engines. Native producer code, datasets and model weights are not bundled. See [advanced commands and engineering notes](docs/ENGINEERING.md) for specific native paths, options, evidence semantics and reproducibility details.
 
