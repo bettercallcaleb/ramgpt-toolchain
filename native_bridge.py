@@ -125,3 +125,60 @@ def exl3_import(store,folder,manifest,native):
     if nt.ref(native)!=source or nt.ref(manifest)!=mref:raise ValueError('Manifest or producer changed')
     identity=digest({'format':'exl3','files':files})
     return save(store,'exl3-first-mover',{'format':'exl3','artifact_id':identity,'repo_id':m['repo_id'],'source_revision':m['source_revision']},{'native_sha256':source['sha256'],'manifest_sha256':mref['sha256'],'file_count':len(files),'artifact_bytes':sum(v['size'] for v in files.values()),'declared_bits':bits,'files':files,'scope':'Native directory manifest verified against current files, excluding README.md per producer protocol; not a GGUF SHA-256, not an independent runtime or historical conversion verification.'})
+
+EXL3_ARCH="""
+import json,runpy,sys
+h=runpy.run_path(sys.argv[1])
+h['CFG']['exllamav3_repo']=sys.argv[2]
+print(json.dumps(h['architecture_supported'](sys.argv[3])))
+"""
+
+def exl3_build(store,source,out,native,backend,python,gpu_uuid,bits,execute=False):
+    import os
+    import shutil
+    import subprocess
+    import runtime
+    if execute is not True:raise ValueError('Explicit --execute required for EXL3 conversion')
+    if not math.isfinite(bits) or not 2<=bits<=8:raise ValueError('Invalid target bitrate')
+    if not runtime.UUID.fullmatch(gpu_uuid):raise ValueError('Select one GPU UUID')
+    source=Path(source).resolve(strict=True);out=Path(out).resolve();native=Path(native).resolve(strict=True);backend=Path(backend).resolve(strict=True)
+    python=Path(os.path.abspath(os.path.expanduser(python)))
+    converter=backend/'convert.py'
+    if not source.is_dir() or not converter.is_file() or not python.is_file() or not os.access(python,os.X_OK):raise ValueError('Local source, official converter and executable Python environment required')
+    if native.name!='fm.py' or (native.parent/'config.json').exists():raise ValueError('Expected clean native First Mover fm.py')
+    if out.exists() or out.is_relative_to(source) or out.is_relative_to(backend):raise ValueError('Require a fresh output directory outside inputs')
+    if any(p.is_symlink() for p in source.rglob('*')):raise ValueError('Materialize source files; symlinks unsupported')
+    cfg=read_json(source/'config.json')
+    if cfg.get('quantization_config'):raise ValueError('Require unquantized source directory')
+    archs=cfg.get('architectures') or cfg.get('text_config',{}).get('architectures') or []
+    if not archs or nt.worker(EXL3_ARCH,[native,backend,archs[0]]) is not True:raise ValueError('Architecture not supported by native inspection')
+    before=nt.worker(EXL3_MANIFEST,[native,source],300)
+    weights=sum(x['size'] for k,x in before.items() if k.endswith('.safetensors'))
+    if not weights or weights>70*2**30:raise ValueError('Missing source weights or source exceeds 70 GiB local limit')
+    if shutil.disk_usage(next(p for p in (out.parent,*out.parents) if p.exists())).free < weights*2+15*2**30:raise ValueError('Insufficient disk for conservative conversion estimate')
+    native_ref=nt.ref(native);converter_ref=nt.ref(converter);backend_ref=nt.tree(backend/'exllamav3')
+    env=dict(os.environ,CUDA_VISIBLE_DEVICES=gpu_uuid,CUDA_DEVICE_ORDER='PCI_BUS_ID')
+    help_run=subprocess.run([str(python),'-E',str(converter),'--help'],cwd=backend,env=env,capture_output=True,text=True,timeout=60)
+    if help_run.returncode or not all(x in help_run.stdout for x in ('--in_dir','--out_dir','--work_dir','--bits','--devices')):raise ValueError('Official converter environment failed preflight: '+help_run.stderr[-1800:])
+    out.mkdir(parents=True,exist_ok=False)
+    artifact=out/'artifact';work=out/'work';artifact.mkdir();work.mkdir()
+    from evaluation import write_new
+    write_new(out/'source-manifest.json',before)
+    with runtime.lease(gpu_uuid):
+        state=runtime.gpu_state().get(gpu_uuid)
+        if not state or runtime.compute_apps(gpu_uuid) or state['used_mib']>512:raise ValueError('Selected GPU is occupied or unavailable')
+        with (out/'convert.log').open('x') as log:
+            cmd=[str(python),'-E',str(converter),'-i',str(source),'-o',str(artifact),'-w',str(work),'-b',str(bits),'-d','0']
+            proc=subprocess.Popen(cmd,cwd=backend,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+            try:
+                if proc.wait()!=0:raise ValueError('Official converter failed; see convert.log')
+            finally:
+                if proc.poll() is None:runtime.stop_owned(proc)
+        if runtime.compute_apps(gpu_uuid) or runtime.gpu_state()[gpu_uuid]['used_mib']>state['used_mib']+128:raise ValueError('GPU did not return to baseline')
+    if native_ref!=nt.ref(native) or converter_ref!=nt.ref(converter) or backend_ref!=nt.tree(backend/'exllamav3') or before!=nt.worker(EXL3_MANIFEST,[native,source],300):raise ValueError('Conversion input changed; output retained')
+    files=nt.worker(EXL3_MANIFEST,[native,artifact],300)
+    if read_json(artifact/'config.json').get('quantization_config',{}).get('quant_method')!='exl3' or not any(k.endswith('.safetensors') and v['size']>0 for k,v in files.items()):raise ValueError('Incomplete EXL3 conversion; see convert.log')
+    manifest={'repo_id':None,'source_revision':None,'bits':bits,'files':files,'local_source_id':digest(before)}
+    write_new(out/'manifest.json',manifest)
+    imported=exl3_import(store,artifact,out/'manifest.json',native)
+    return save(store,'exl3-first-mover',{'format':'exl3','artifact_id':imported['subject']['artifact_id'],'repo_id':None,'source_revision':None},{'artifact_bytes':imported['artifact_bytes'],'declared_bits':bits,'local_source_id':digest(before),'native_manifest_report_id':imported['report_id'],'converter_sha256':converter_ref['sha256'],'backend_source_sha256':backend_ref,'scope':'Official ExLlamaV3 local conversion completed; output manifest verified, no generation or runtime quality validation.'})

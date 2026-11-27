@@ -19,8 +19,8 @@ def tree(root):
     if not files:raise ValueError('Empty native source tree')
     return digest([(str(p.relative_to(root)),(hashlib.sha256(b'').hexdigest() if p.stat().st_size==0 else ref(p)['sha256'])) for p in files])
 
-def worker(code,argv,timeout=180):
-    p=subprocess.run([sys.executable,'-I','-c',code,*map(str,argv)],capture_output=True,text=True,timeout=timeout)
+def worker(code,argv,timeout=180,env=None):
+    p=subprocess.run([sys.executable,'-I','-c',code,*map(str,argv)],capture_output=True,text=True,timeout=timeout,env=env)
     if p.returncode:raise ValueError('Native tool failed: '+p.stderr[-2500:])
     return json.loads(p.stdout)
 
@@ -90,16 +90,21 @@ def healer_import(reg,store,manifest,native,gguf_root,max_growth):
 LADDER_SCORE="""
 import runpy,sys
 sys.path.insert(0,sys.argv[1])
-sys.argv=['conceptladder','measure','score',*sys.argv[2:]]
+if sys.argv[2]:sys.path.insert(1,sys.argv[2])
+sys.argv=['conceptladder','measure','score',*sys.argv[3:]]
 runpy.run_module('conceptladder',run_name='__main__')
 """
 
-def ladder_import(reg,store,model,raw,native,seed,variants):
+def ladder_import(reg,store,model,raw,native,seed,variants,track="knowledge",ifeval_root=None,limit=None,deps=None,nltk_data=None):
+    import os
     raw=Path(raw).resolve(strict=True);native=Path(native).resolve(strict=True)
     manifest=raw.with_suffix(raw.suffix+'.manifest.json')
     report=raw.with_suffix(raw.suffix+'.report.json')
     m=read_json(manifest);expected=read_json(report)
-    if m['track']!='knowledge' or m['version']!='measurement-v0.5':raise ValueError('Only native v0.5 knowledge reports supported')
+    if track not in ('knowledge','ifeval') or m['track']!=track or m['version']!='measurement-v0.5':raise ValueError('Expected matching native v0.5 track')
+    if track=='knowledge' and any(x is not None for x in (ifeval_root,limit,deps,nltk_data)):raise ValueError('IFEval options require --track ifeval')
+    if track=='ifeval' and not ifeval_root:raise ValueError('IFEval requires --ifeval-root')
+    if limit is not None and (type(limit) is not int or not 1<=limit<=541):raise ValueError('Invalid IFEval subset size')
     artifact=fingerprint(model,'model')
     profile=m['profile']
     parts=profile.split('; ')
@@ -109,11 +114,20 @@ def ladder_import(reg,store,model,raw,native,seed,variants):
         copy=Path(tmp)/'responses.jsonl'
         copy.write_bytes(raw.read_bytes())
         copy.with_suffix('.jsonl.manifest.json').write_bytes(manifest.read_bytes())
-        actual=worker(LADDER_SCORE,[native,'--track','knowledge','--seed',seed,'--variants',variants,'--out',copy])
-    if actual!=expected or actual['complete'] is not True or actual['dataset_sha256']!=m['dataset_sha256']:raise ValueError('Native report parity or completeness failure')
+        args=[native,Path(deps).resolve(strict=True) if deps else '', '--track',track,'--seed',seed,'--variants',variants,'--out',copy]
+        env=dict(os.environ)
+        if track=='ifeval':
+            args+=['--ifeval-root',Path(ifeval_root).resolve(strict=True)]
+            if limit is not None:args+=['--limit',limit]
+            if nltk_data:env['NLTK_DATA']=str(Path(nltk_data).resolve(strict=True))
+        actual=worker(LADDER_SCORE,args,env=env)
+    legacy_report_version=(track=='ifeval' and 'report_version' not in expected and actual.get('report_version')=='measurement-report-v0.5.1')
+    comparable={k:v for k,v in actual.items() if not (legacy_report_version and k=='report_version')}
+    if comparable!=expected or actual['complete'] is not True or actual['dataset_sha256']!=m['dataset_sha256']:raise ValueError('Native report parity or completeness failure')
     if refs!=[ref(x) for x in (raw,manifest,report)] or source!=tree(native/'conceptladder') or artifact!=fingerprint(model,'model'):raise ValueError('Input changed during replay')
+    if track=='ifeval' and (actual.get('ifeval_source_hashes')!=m.get('ifeval_source_hashes') or actual['expected_n']!=(limit or 541)):raise ValueError('IFEval source or subset mismatch')
     with reg.db:reg.remember(artifact)
-    return save(store,'conceptladder',artifact['sha256'],{'artifact_bytes':artifact['bytes'],'source_sha256':source,'raw_sha256':refs[0]['sha256'],'manifest_sha256':refs[1]['sha256'],'report_sha256':refs[2]['sha256'],'seed':seed,'variants':variants,'result':actual,'scope':'Historical native regrading; current artifact matches declared path and size only. Historical weight identity and execution settings are not independently established.'})
+    return save(store,'conceptladder',artifact['sha256'],{'artifact_bytes':artifact['bytes'],'source_sha256':source,'raw_sha256':refs[0]['sha256'],'manifest_sha256':refs[1]['sha256'],'report_sha256':refs[2]['sha256'],'seed':seed,'variants':variants,'result':actual,**({'track':'ifeval','limit':limit,'official_full_dataset':limit in (None,541),'legacy_report_version_added':legacy_report_version,'ifeval_source_hashes':actual['ifeval_source_hashes']} if track=='ifeval' else {}),'scope':'Historical native regrading; current artifact matches declared path and size only. Historical weight identity and execution settings are not independently established.'})
 
 
 HEALER_COMPOSE="""

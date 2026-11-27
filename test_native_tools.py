@@ -62,6 +62,30 @@ class NativeToolTests(unittest.TestCase):
                         n.healer_compose(reg,store,p/'base.gguf',p/'donor.gguf',p/'new.gguf',os.environ['HEALER_TEST_SCRIPT'],root,['output.weight'],.5,True)
                 finally:reg.close();store.close()
         finally:sys.path.remove(str(root))
+    def test_ifeval_legacy_report_version_only(self):
+        import json
+        import struct
+        import registry
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);model=p/'model.gguf'
+            model.write_bytes(b'GGUF'+struct.pack('<IQQ',3,1,0)+b'x')
+            native=p/'native';(native/'conceptladder').mkdir(parents=True)
+            (native/'conceptladder/__init__.py').write_text('')
+            raw=p/'responses.jsonl';raw.write_text('{}\n')
+            h={'evaluation_lib.py':'a'*64}
+            manifest={'track':'ifeval','version':'measurement-v0.5','profile':f'model={model}; bytes={model.stat().st_size}','dataset_sha256':'b'*64,'ifeval_source_hashes':h}
+            result={'track':'ifeval','complete':True,'expected_n':120,'dataset_sha256':'b'*64,'ifeval_source_hashes':h,'strict_prompt':.5}
+            raw.with_suffix('.jsonl.manifest.json').write_text(json.dumps(manifest))
+            raw.with_suffix('.jsonl.report.json').write_text(json.dumps(result))
+            reg=registry.Registry(p/'reg.sqlite');store=evidence.Store(p/'ev.sqlite')
+            try:
+                with patch.object(n,'worker',return_value={**result,'report_version':'measurement-report-v0.5.1'}):
+                    r=n.ladder_import(reg,store,model,raw,native,211,1,'ifeval',p,120)
+                self.assertTrue(r['legacy_report_version_added'])
+                self.assertFalse(r['official_full_dataset'])
+                with patch.object(n,'worker',return_value={**result,'strict_prompt':.6,'report_version':'measurement-report-v0.5.1'}):
+                    with self.assertRaisesRegex(ValueError,'report parity'):n.ladder_import(reg,store,model,raw,native,211,1,'ifeval',p,120)
+            finally:reg.close();store.close()
     def test_worker_isolated_and_json(self):
         self.assertEqual(n.worker('import json,sys;print(json.dumps(sys.argv[1:]))',['x']),['x'])
         with self.assertRaisesRegex(ValueError,'Native tool failed'):n.worker('raise ValueError("bad")',[])

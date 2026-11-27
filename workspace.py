@@ -15,9 +15,11 @@ TOOLS={
  'budgetfit':({'evaluator':'file'},['select','router-prepare']),
  'llama-autotune':({'autotune_source':'directory'},['runtime-prepare','runtime-compare']),
  'gguf-healer':({'native':'file','gguf_root':'directory'},['healer-compose','healer-import']),
- 'exl3-first-mover':({'native':'file','backend':'directory'},['exl3-preflight','exl3-import']),
+ 'exl3-first-mover':({'native':'file','backend':'directory'},['exl3-preflight','exl3-build','exl3-import']),
  'hereticbench':({'native':'directory'},['heretic-import'])
 }
+
+OPTIONAL={'conceptladder':{'ifeval_root','deps','nltk_data'},'exl3-first-mover':{'python'}}
 
 def load(path):
     if path is None:return {}
@@ -25,13 +27,13 @@ def load(path):
     if not isinstance(doc,dict) or set(doc)!={'tools'} or not isinstance(doc['tools'],dict):raise ValueError('Expected tools configuration object')
     out={}
     for name,values in doc['tools'].items():
-        if name not in TOOLS or not isinstance(values,dict) or set(values)-TOOLS[name][0].keys():raise ValueError('Unknown tool or configuration field: '+name)
+        if name not in TOOLS or not isinstance(values,dict) or set(values)-(TOOLS[name][0].keys()|OPTIONAL.get(name,set())):raise ValueError('Unknown tool or configuration field: '+name)
         out[name]={}
         for k,v in values.items():
             if not isinstance(v,str) or not v.strip():raise ValueError('Expected nonempty path')
             q=Path(v).expanduser()
             if not q.is_absolute():q=p.parent/q
-            out[name][k]=str(q.resolve())
+            out[name][k]=os.path.abspath(q) if k=='python' else str(q.resolve())
     return out
 
 def catalog(config):
@@ -48,11 +50,14 @@ def catalog(config):
 
 def apply(args,config):
     action=args.action
-    mapping={'build':'q4fit','healer-compose':'gguf-healer','healer-import':'gguf-healer','ladder-import':'conceptladder','exl3-preflight':'exl3-first-mover','exl3-import':'exl3-first-mover','heretic-import':'hereticbench','runtime-prepare':'llama-autotune','router-parity':'budgetfit','prepare':'budgetfit'}
+    mapping={'build':'q4fit','healer-compose':'gguf-healer','healer-import':'gguf-healer','ladder-import':'conceptladder','exl3-build':'exl3-first-mover','exl3-preflight':'exl3-first-mover','exl3-import':'exl3-first-mover','heretic-import':'hereticbench','runtime-prepare':'llama-autotune','router-parity':'budgetfit','prepare':'budgetfit'}
     tool=mapping.get(action)
     if action=='weight-import' and args.kind!='recipe':tool=args.kind
     if tool is None:return
-    keys={'build':('native','quantizer','gguf_root'),'healer-compose':('native','gguf_root'),'healer-import':('native','gguf_root'),'ladder-import':('native',),'exl3-preflight':('native','backend'),'exl3-import':('native',),'heretic-import':('native',),'weight-import':('native',),'runtime-prepare':('autotune_source',),'router-parity':('evaluator',),'prepare':('evaluator',)}[action]
+    keys={'build':('native','quantizer','gguf_root'),'healer-compose':('native','gguf_root'),'healer-import':('native','gguf_root'),'ladder-import':('native',),'exl3-build':('native','backend','python'),'exl3-preflight':('native','backend'),'exl3-import':('native',),'heretic-import':('native',),'weight-import':('native',),'runtime-prepare':('autotune_source',),'router-parity':('evaluator',),'prepare':('evaluator',)}[action]
+    if action=='ladder-import' and getattr(args,'track','knowledge')=='ifeval':
+        for k in ('ifeval_root','deps','nltk_data'):
+            if getattr(args,k,None) is None:setattr(args,k,config.get(tool,{}).get(k))
     for k in keys:
         if getattr(args,k,None) is None:setattr(args,k,config.get(tool,{}).get(k))
         if not getattr(args,k,None):raise ValueError('Supply --'+k.replace('_','-')+' or configure '+tool+'.'+k)
@@ -64,7 +69,7 @@ def model_info(reg,store,subject):
         if not rows:raise ValueError('Unknown EXL3 artifact identity')
         sizes={r['artifact_bytes'] for r in rows}
         if len(sizes)!=1:raise ValueError('Conflicting EXL3 size')
-        return {'format':'exl3','artifact_id':aid,'bytes':sizes.pop(),'producer_reports':[{'report_id':r['report_id'],'repo_id':r['subject']['repo_id'],'source_revision':r['subject']['source_revision'],'declared_bits':r['declared_bits']} for r in rows],'runtime_evidence':[],'scope':'EXL3 manifest identity; native runtime integration pending'}
+        return {'format':'exl3','artifact_id':aid,'bytes':sizes.pop(),'producer_reports':[{'report_id':r['report_id'],'repo_id':r['subject']['repo_id'],'source_revision':r['subject']['source_revision'],'declared_bits':r['declared_bits'],**({'local_source_id':r['local_source_id']} if 'local_source_id' in r else {})} for r in rows],'runtime_evidence':[],'scope':'EXL3 manifest identity; native runtime integration pending'}
     aid=subject if re.fullmatch('[0-9a-f]{64}',subject) else fingerprint(subject,'model')['sha256']
     view=weight.artifact_view(store,aid)
     receipts=native_tools.find(store,aid)
